@@ -3,11 +3,13 @@ import { Article } from "../db/schema";
 export function generateRssFeed(articles: Article[]): string {
   const publicUrl = process.env.PUBLIC_URL || `http://localhost:5000`;
   const now = new Date().toUTCString();
-  
+
   const podcastItems = articles
     .filter(article => article.status === "completed" && article.audioUrl)
     .map(article => {
-      const pubDate = article.publishedAt ? new Date(article.publishedAt).toUTCString() : now;
+      const pubDate = article.publishedAt
+        ? new Date(article.publishedAt).toUTCString()
+        : now;
       const metadata = article.metadata as { duration?: number; contentLength?: number } || {};
       
       // Format duration as HH:MM:SS
@@ -16,6 +18,11 @@ export function generateRssFeed(articles: Article[]): string {
       const minutes = Math.floor((duration % 3600) / 60);
       const seconds = duration % 60;
       const formattedDuration = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      
+      // Combine publicUrl with audioUrl for full URL
+      const fullAudioUrl = article.audioUrl?.startsWith('http')
+        ? article.audioUrl
+        : `${publicUrl}${article.audioUrl}`;
 
       return `
         <item>
@@ -24,7 +31,7 @@ export function generateRssFeed(articles: Article[]): string {
           <pubDate>${pubDate}</pubDate>
           <guid isPermaLink="false">${publicUrl}/api/articles/${article.id}</guid>
           <enclosure 
-            url="${article.audioUrl}" 
+            url="${escapeXml(fullAudioUrl)}" 
             type="audio/mpeg" 
             length="${metadata.contentLength || 0}"
           />

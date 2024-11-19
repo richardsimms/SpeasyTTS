@@ -4,6 +4,8 @@ import { articles } from "../db/schema";
 import { generateSpeech, extractArticle } from "./openai";
 import { generateRssFeed } from "./rss";
 import { eq, max } from "drizzle-orm";
+import { writeFile } from "fs/promises";
+import { join } from "path";
 
 export function registerRoutes(app: Express) {
   app.post("/api/articles", async (req, res) => {
@@ -37,8 +39,14 @@ export function registerRoutes(app: Express) {
       // Generate speech in background
       generateSpeech(articleData.content)
         .then(async (audioBuffer) => {
-          // In a real app, save to cloud storage and get URL
-          const audioUrl = `data:audio/mp3;base64,${audioBuffer.toString('base64')}`;
+          const audioFileName = `${article.id}.mp3`;
+          const audioPath = join('/tmp', audioFileName);
+          
+          // Save audio file to disk
+          await writeFile(audioPath, audioBuffer);
+          
+          // Set audio URL as API endpoint path
+          const audioUrl = `/api/audio/${audioFileName}`;
           
           // Get audio duration and file size
           const audioDuration = Math.ceil(audioBuffer.length / (44100 * 2 * 2)); // Approximate duration for 44.1kHz stereo
@@ -55,14 +63,24 @@ export function registerRoutes(app: Express) {
             })
             .where(eq(articles.id, article.id));
         })
-        .catch(async (error) => {
+        .catch(async (error: Error) => {
           await db.update(articles)
             .set({ status: "failed", metadata: { error: error.message } })
             .where(eq(articles.id, article.id));
         });
 
       res.json(article);
-    } catch (error) {
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Serve audio files
+  app.get("/api/audio/:filename", async (req, res) => {
+    try {
+      const audioPath = join('/tmp', req.params.filename);
+      res.sendFile(audioPath);
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
@@ -71,7 +89,7 @@ export function registerRoutes(app: Express) {
     try {
       const allArticles = await db.select().from(articles);
       res.json(allArticles);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
@@ -87,7 +105,7 @@ export function registerRoutes(app: Express) {
       }
       
       res.json(article);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
@@ -99,7 +117,7 @@ export function registerRoutes(app: Express) {
       const rssFeed = generateRssFeed(allArticles);
       res.set('Content-Type', 'application/xml');
       res.send(rssFeed);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });

@@ -1,4 +1,5 @@
-import { Article } from "../db/schema";
+import { type Article } from "../db/schema";
+import { type AudioMetadata } from "./routes";
 
 export function generateRssFeed(articles: Article[]): string {
   const publicUrl = process.env.PUBLIC_URL || `http://localhost:5000`;
@@ -12,16 +13,17 @@ export function generateRssFeed(articles: Article[]): string {
         ? new Date(article.publishedAt).toUTCString()
         : now;
 
-      const metadata = article.metadata as { duration?: number; contentLength?: number } || {};
+      // Parse metadata
+      const metadata = article.metadata as AudioMetadata;
       
       // Format duration as HH:MM:SS
-      const duration = metadata.duration || 0;
+      const duration = metadata?.duration || 0;
       const hours = Math.floor(duration / 3600);
       const minutes = Math.floor((duration % 3600) / 60);
       const seconds = duration % 60;
       const formattedDuration = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
       
-      // Combine publicUrl with audioUrl for full URL
+      // Ensure full URL for audio files
       const fullAudioUrl = article.audioUrl?.startsWith('http')
         ? article.audioUrl
         : `${publicUrl}${article.audioUrl}`;
@@ -35,7 +37,7 @@ export function generateRssFeed(articles: Article[]): string {
           <enclosure 
             url="${escapeXml(fullAudioUrl)}" 
             type="audio/mpeg" 
-            length="${metadata.contentLength || 0}"
+            length="${metadata?.contentLength || 0}"
           />
           <itunes:duration>${formattedDuration}</itunes:duration>
           <itunes:summary>${escapeXml(article.podcastDescription || article.content.substring(0, 400) + '...')}</itunes:summary>

@@ -7,6 +7,12 @@ import { eq, max } from "drizzle-orm";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 
+export interface AudioMetadata {
+  duration?: number;
+  contentLength?: number;
+  error?: string;
+}
+
 export function registerRoutes(app: Express) {
   app.post("/api/articles", async (req, res) => {
     try {
@@ -38,7 +44,8 @@ export function registerRoutes(app: Express) {
         publishedAt,
         episodeNumber: nextEpisodeNumber,
         podcastTitle,
-        podcastDescription
+        podcastDescription,
+        metadata: {}, // Initialize empty metadata as JSONB
       }).returning();
 
       // Ensure audio directory exists
@@ -76,13 +83,20 @@ export function registerRoutes(app: Express) {
             .where(eq(articles.id, article.id));
         })
         .catch(async (error: Error) => {
+          console.error('Speech generation error:', error);
           await db.update(articles)
-            .set({ status: "failed", metadata: { error: error.message } })
+            .set({ 
+              status: "failed", 
+              metadata: {
+                error: error.message 
+              }
+            })
             .where(eq(articles.id, article.id));
         });
 
       res.json(article);
     } catch (error: any) {
+      console.error('Article creation error:', error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -92,6 +106,7 @@ export function registerRoutes(app: Express) {
       const allArticles = await db.select().from(articles);
       res.json(allArticles);
     } catch (error: any) {
+      console.error('Article fetch error:', error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -108,6 +123,7 @@ export function registerRoutes(app: Express) {
       
       res.json(article);
     } catch (error: any) {
+      console.error('Single article fetch error:', error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -120,6 +136,7 @@ export function registerRoutes(app: Express) {
       res.set('Content-Type', 'application/xml');
       res.send(rssFeed);
     } catch (error: any) {
+      console.error('RSS feed generation error:', error);
       res.status(500).json({ error: error.message });
     }
   });

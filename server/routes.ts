@@ -40,13 +40,13 @@ export function registerRoutes(app: Express) {
       generateSpeech(articleData.content)
         .then(async (audioBuffer) => {
           const audioFileName = `${article.id}.mp3`;
-          const audioPath = join('/tmp', audioFileName);
+          const audioPath = join(process.cwd(), 'public/audio', audioFileName);
           
           // Save audio file to disk
           await writeFile(audioPath, audioBuffer);
           
-          // Set audio URL as API endpoint path
-          const audioUrl = `/api/audio/${audioFileName}`;
+          // Set audio URL as public path
+          const audioUrl = `/public/audio/${audioFileName}`;
           
           // Get audio duration and file size
           const audioDuration = Math.ceil(audioBuffer.length / (44100 * 2 * 2)); // Approximate duration for 44.1kHz stereo
@@ -70,16 +70,6 @@ export function registerRoutes(app: Express) {
         });
 
       res.json(article);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Serve audio files
-  app.get("/api/audio/:filename", async (req, res) => {
-    try {
-      const audioPath = join('/tmp', req.params.filename);
-      res.sendFile(audioPath);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

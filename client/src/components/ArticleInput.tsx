@@ -89,7 +89,7 @@ export default function ArticleInput({ onConvert }: { onConvert: () => void }) {
             />
           </TabsContent>
           
-          <Button type="submit" disabled={isLoading}>
+          <Button type="submit" disabled={isLoading} className="text-white">
             {isLoading ? "Converting..." : "Convert to Audio"}
           </Button>
         </form>

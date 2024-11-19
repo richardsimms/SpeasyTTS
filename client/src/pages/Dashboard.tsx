@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import useSWR from "swr";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { Moon, Sun } from "lucide-react";
 import ArticleInput from "../components/ArticleInput";
 import AudioPlayer from "../components/AudioPlayer";
 import ConversionStatus from "../components/ConversionStatus";
@@ -17,12 +19,26 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [mutate]);
 
+  const toggleTheme = () => {
+    const html = document.documentElement;
+    const currentTheme = html.classList.contains('dark') ? 'light' : 'dark';
+    html.classList.remove('light', 'dark');
+    html.classList.add(currentTheme);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-background/80">
       <div className="container mx-auto p-6">
-        <h1 className="text-4xl font-bold mb-8 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-          Article to Audio
-        </h1>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-4xl font-bold text-white">
+            Article to Audio
+          </h1>
+          <Button variant="ghost" size="icon" onClick={toggleTheme}>
+            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <span className="sr-only">Toggle theme</span>
+          </Button>
+        </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div>

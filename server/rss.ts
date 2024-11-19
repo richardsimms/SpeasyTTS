@@ -2,9 +2,9 @@ import { type Article } from "../db/schema";
 import { type AudioMetadata } from "./routes";
 
 export function generateRssFeed(articles: Article[]): string {
-  const publicUrl = process.env.PUBLIC_URL?.includes('localhost')
-    ? 'https://speasy.replit.app'
-    : (process.env.PUBLIC_URL || 'https://speasy.replit.app');
+  const publicUrl =
+    process.env.PUBLIC_URL?.replace(/\/$/, "") ||
+    "https://speasy.replit.app/public/audio/";
   const now = new Date().toUTCString();
 
   const podcastItems = articles
@@ -26,9 +26,9 @@ export function generateRssFeed(articles: Article[]): string {
       const formattedDuration = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 
       // Ensure full URL for audio files
-      const fullAudioUrl = article.audioUrl?.startsWith('http')
+      const fullAudioUrl = article.audioUrl?.startsWith("http")
         ? article.audioUrl
-        : `${publicUrl}/public${article.audioUrl}`;
+        : `${publicUrl}${article.audioUrl}`;
 
       return `
         <item>
@@ -55,7 +55,7 @@ export function generateRssFeed(articles: Article[]): string {
      xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"
      xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
-    <title>Article to Audio Podcast</title>
+    <title>Speasy</title>
     <link>${publicUrl}</link>
     <description>Automatically converted articles to audio format</description>
     <language>en-us</language>

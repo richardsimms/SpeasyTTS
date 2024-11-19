@@ -7,9 +7,11 @@ export function generateRssFeed(articles: Article[]): string {
   const podcastItems = articles
     .filter(article => article.status === "completed" && article.audioUrl)
     .map(article => {
+      // Format publication date
       const pubDate = article.publishedAt
         ? new Date(article.publishedAt).toUTCString()
         : now;
+
       const metadata = article.metadata as { duration?: number; contentLength?: number } || {};
       
       // Format duration as HH:MM:SS

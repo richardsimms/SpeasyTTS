@@ -4,7 +4,7 @@ import { articles } from "../db/schema";
 import { generateSpeech, extractArticle } from "./openai";
 import { generateRssFeed } from "./rss";
 import { eq, max } from "drizzle-orm";
-import { writeFile } from "fs/promises";
+import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 
 export function registerRoutes(app: Express) {
@@ -25,16 +25,25 @@ export function registerRoutes(app: Express) {
         .from(articles);
       const nextEpisodeNumber = (latestEpisode?.maxEpisode || 0) + 1;
 
+      // Set podcast metadata
+      const podcastTitle = articleData.title;
+      const podcastDescription = articleData.content.substring(0, 1000) + '...'; // Truncate for description
+      const publishedAt = new Date();
+
       const [article] = await db.insert(articles).values({
         title: articleData.title,
         content: articleData.content,
         url: url || null,
         status: "processing",
-        publishedAt: new Date(),
+        publishedAt,
         episodeNumber: nextEpisodeNumber,
-        podcastTitle: articleData.title,
-        podcastDescription: articleData.content.substring(0, 1000) + '...' // Truncate for description
+        podcastTitle,
+        podcastDescription
       }).returning();
+
+      // Ensure audio directory exists
+      const audioDir = join(process.cwd(), 'public/audio');
+      await mkdir(audioDir, { recursive: true });
 
       // Generate speech in background
       generateSpeech(articleData.content)
@@ -48,8 +57,11 @@ export function registerRoutes(app: Express) {
           // Set audio URL as public path
           const audioUrl = `/public/audio/${audioFileName}`;
           
-          // Get audio duration and file size
-          const audioDuration = Math.ceil(audioBuffer.length / (44100 * 2 * 2)); // Approximate duration for 44.1kHz stereo
+          // Calculate audio duration and file size
+          const sampleRate = 44100; // 44.1kHz
+          const channels = 2; // Stereo
+          const bytesPerSample = 2; // 16-bit audio
+          const audioDuration = Math.ceil(audioBuffer.length / (sampleRate * channels * bytesPerSample));
           const contentLength = audioBuffer.length;
 
           await db.update(articles)

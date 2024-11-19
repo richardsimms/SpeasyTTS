@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { db } from "../db";
 import { articles } from "../db/schema";
 import { generateSpeech, extractArticle } from "./openai";
+import { generateRssFeed } from "./rss";
 import { eq } from "drizzle-orm";
 
 export function registerRoutes(app: Express) {
@@ -20,7 +21,8 @@ export function registerRoutes(app: Express) {
         title: articleData.title,
         content: articleData.content,
         url: url || null,
-        status: "processing"
+        status: "processing",
+        publishedAt: new Date()
       }).returning();
 
       // Generate speech in background
@@ -64,6 +66,18 @@ export function registerRoutes(app: Express) {
       }
       
       res.json(article);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // RSS feed endpoint
+  app.get("/api/feed.xml", async (req, res) => {
+    try {
+      const allArticles = await db.select().from(articles);
+      const rssFeed = generateRssFeed(allArticles);
+      res.set('Content-Type', 'application/xml');
+      res.send(rssFeed);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

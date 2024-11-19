@@ -10,7 +10,12 @@ export const articles = pgTable("articles", {
   audioUrl: text("audio_url"),
   status: text("status").default("pending").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  metadata: jsonb("metadata").default({})
+  metadata: jsonb("metadata").default({}),
+  // RSS podcast metadata fields
+  podcastTitle: text("podcast_title"),
+  podcastDescription: text("podcast_description"),
+  episodeNumber: integer("episode_number"),
+  publishedAt: timestamp("published_at")
 });
 
 export const insertArticleSchema = createInsertSchema(articles);

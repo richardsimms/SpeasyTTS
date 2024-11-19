@@ -8,14 +8,27 @@ export function generateRssFeed(articles: Article[]): string {
     .filter(article => article.status === "completed" && article.audioUrl)
     .map(article => {
       const pubDate = article.publishedAt ? new Date(article.publishedAt).toUTCString() : now;
+      const metadata = article.metadata as { duration?: number; contentLength?: number } || {};
+      
+      // Format duration as HH:MM:SS
+      const duration = metadata.duration || 0;
+      const hours = Math.floor(duration / 3600);
+      const minutes = Math.floor((duration % 3600) / 60);
+      const seconds = duration % 60;
+      const formattedDuration = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
       return `
         <item>
           <title>${escapeXml(article.podcastTitle || article.title)}</title>
           <description>${escapeXml(article.podcastDescription || article.content.substring(0, 400) + '...')}</description>
           <pubDate>${pubDate}</pubDate>
           <guid isPermaLink="false">${publicUrl}/api/articles/${article.id}</guid>
-          <enclosure url="${article.audioUrl}" type="audio/mpeg" length="0"/>
-          <itunes:duration>00:00:00</itunes:duration>
+          <enclosure 
+            url="${article.audioUrl}" 
+            type="audio/mpeg" 
+            length="${metadata.contentLength || 0}"
+          />
+          <itunes:duration>${formattedDuration}</itunes:duration>
           <itunes:summary>${escapeXml(article.podcastDescription || article.content.substring(0, 400) + '...')}</itunes:summary>
           <itunes:explicit>no</itunes:explicit>
           ${article.episodeNumber ? `<itunes:episode>${article.episodeNumber}</itunes:episode>` : ''}
@@ -25,7 +38,9 @@ export function generateRssFeed(articles: Article[]): string {
     .join('\n');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+<rss version="2.0" 
+     xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"
+     xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>Article to Audio Podcast</title>
     <link>${publicUrl}</link>
@@ -42,6 +57,7 @@ export function generateRssFeed(articles: Article[]): string {
 }
 
 function escapeXml(unsafe: string): string {
+  if (!unsafe) return '';
   return unsafe.replace(/[<>&'"]/g, (c) => {
     switch (c) {
       case '<': return '&lt;';

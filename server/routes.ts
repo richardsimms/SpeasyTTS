@@ -3,7 +3,7 @@ import { db } from "../db";
 import { articles } from "../db/schema";
 import { generateSpeech, extractArticle } from "./openai";
 import { generateRssFeed } from "./rss";
-import { eq } from "drizzle-orm";
+import { eq, max } from "drizzle-orm";
 
 export function registerRoutes(app: Express) {
   app.post("/api/articles", async (req, res) => {
@@ -17,12 +17,21 @@ export function registerRoutes(app: Express) {
         articleData = { title: "Custom Text", content };
       }
 
+      // Get the latest episode number
+      const [latestEpisode] = await db
+        .select({ maxEpisode: max(articles.episodeNumber) })
+        .from(articles);
+      const nextEpisodeNumber = (latestEpisode?.maxEpisode || 0) + 1;
+
       const [article] = await db.insert(articles).values({
         title: articleData.title,
         content: articleData.content,
         url: url || null,
         status: "processing",
-        publishedAt: new Date()
+        publishedAt: new Date(),
+        episodeNumber: nextEpisodeNumber,
+        podcastTitle: articleData.title,
+        podcastDescription: articleData.content.substring(0, 1000) + '...' // Truncate for description
       }).returning();
 
       // Generate speech in background
@@ -30,8 +39,20 @@ export function registerRoutes(app: Express) {
         .then(async (audioBuffer) => {
           // In a real app, save to cloud storage and get URL
           const audioUrl = `data:audio/mp3;base64,${audioBuffer.toString('base64')}`;
+          
+          // Get audio duration and file size
+          const audioDuration = Math.ceil(audioBuffer.length / (44100 * 2 * 2)); // Approximate duration for 44.1kHz stereo
+          const contentLength = audioBuffer.length;
+
           await db.update(articles)
-            .set({ audioUrl, status: "completed" })
+            .set({ 
+              audioUrl, 
+              status: "completed",
+              metadata: {
+                duration: audioDuration,
+                contentLength: contentLength
+              }
+            })
             .where(eq(articles.id, article.id));
         })
         .catch(async (error) => {

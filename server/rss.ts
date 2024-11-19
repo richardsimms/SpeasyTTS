@@ -2,7 +2,7 @@ import { type Article } from "../db/schema";
 import { type AudioMetadata } from "./routes";
 
 export function generateRssFeed(articles: Article[]): string {
-  const publicUrl = process.env.PUBLIC_URL || `http://localhost:5000`;
+  const publicUrl = process.env.PUBLIC_URL?.replace(/\/$/, '') || 'http://localhost:5000';
   const now = new Date().toUTCString();
 
   const podcastItems = articles

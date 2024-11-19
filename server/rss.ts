@@ -2,12 +2,14 @@ import { type Article } from "../db/schema";
 import { type AudioMetadata } from "./routes";
 
 export function generateRssFeed(articles: Article[]): string {
-  const publicUrl = process.env.PUBLIC_URL?.replace(/\/$/, '') || 'http://localhost:5000';
+  const publicUrl = process.env.PUBLIC_URL?.includes('localhost')
+    ? 'https://speasy.replit.app'
+    : (process.env.PUBLIC_URL || 'https://speasy.replit.app');
   const now = new Date().toUTCString();
 
   const podcastItems = articles
-    .filter(article => article.status === "completed" && article.audioUrl)
-    .map(article => {
+    .filter((article) => article.status === "completed" && article.audioUrl)
+    .map((article) => {
       // Format publication date
       const pubDate = article.publishedAt
         ? new Date(article.publishedAt).toUTCString()
@@ -15,23 +17,23 @@ export function generateRssFeed(articles: Article[]): string {
 
       // Parse metadata
       const metadata = article.metadata as AudioMetadata;
-      
+
       // Format duration as HH:MM:SS
       const duration = metadata?.duration || 0;
       const hours = Math.floor(duration / 3600);
       const minutes = Math.floor((duration % 3600) / 60);
       const seconds = duration % 60;
-      const formattedDuration = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-      
+      const formattedDuration = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+
       // Ensure full URL for audio files
       const fullAudioUrl = article.audioUrl?.startsWith('http')
         ? article.audioUrl
-        : `${publicUrl}${article.audioUrl}`;
+        : `${publicUrl}/public${article.audioUrl}`;
 
       return `
         <item>
           <title>${escapeXml(article.podcastTitle || article.title)}</title>
-          <description>${escapeXml(article.podcastDescription || article.content.substring(0, 400) + '...')}</description>
+          <description>${escapeXml(article.podcastDescription || article.content.substring(0, 400) + "...")}</description>
           <pubDate>${pubDate}</pubDate>
           <guid isPermaLink="false">${publicUrl}/api/articles/${article.id}</guid>
           <enclosure 
@@ -40,13 +42,13 @@ export function generateRssFeed(articles: Article[]): string {
             length="${metadata?.contentLength || 0}"
           />
           <itunes:duration>${formattedDuration}</itunes:duration>
-          <itunes:summary>${escapeXml(article.podcastDescription || article.content.substring(0, 400) + '...')}</itunes:summary>
+          <itunes:summary>${escapeXml(article.podcastDescription || article.content.substring(0, 400) + "...")}</itunes:summary>
           <itunes:explicit>no</itunes:explicit>
-          ${article.episodeNumber ? `<itunes:episode>${article.episodeNumber}</itunes:episode>` : ''}
+          ${article.episodeNumber ? `<itunes:episode>${article.episodeNumber}</itunes:episode>` : ""}
         </item>
       `;
     })
-    .join('\n');
+    .join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" 
@@ -68,15 +70,21 @@ export function generateRssFeed(articles: Article[]): string {
 }
 
 function escapeXml(unsafe: string): string {
-  if (!unsafe) return '';
+  if (!unsafe) return "";
   return unsafe.replace(/[<>&'"]/g, (c) => {
     switch (c) {
-      case '<': return '&lt;';
-      case '>': return '&gt;';
-      case '&': return '&amp;';
-      case "'": return '&apos;';
-      case '"': return '&quot;';
-      default: return c;
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case "&":
+        return "&amp;";
+      case "'":
+        return "&apos;";
+      case '"':
+        return "&quot;";
+      default:
+        return c;
     }
   });
 }

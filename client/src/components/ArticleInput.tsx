@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,26 +10,41 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { convertArticle } from "../lib/api";
 
-const formSchema = z.object({
-  url: z.string().url().optional(),
-  content: z.string().min(10).optional(),
-}).refine((data) => data.url || data.content, {
-  message: "Either URL or content must be provided",
+const urlFormSchema = z.object({
+  url: z.string().url("Please enter a valid URL"),
+  content: z.string().optional(),
+});
+
+const textFormSchema = z.object({
+  url: z.string().optional(),
+  content: z.string().min(10, "Content must be at least 10 characters long"),
 });
 
 export default function ArticleInput({ onConvert }: { onConvert: () => void }) {
   const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"url" | "text">("url");
   const { toast } = useToast();
   
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<z.infer<typeof urlFormSchema>>({
+    resolver: zodResolver(activeTab === "url" ? urlFormSchema : textFormSchema),
     defaultValues: {
       url: "",
       content: "",
     },
   });
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  // Reset the other field when switching tabs
+  useEffect(() => {
+    if (activeTab === "url") {
+      form.setValue("content", "");
+      form.clearErrors("content");
+    } else {
+      form.setValue("url", "");
+      form.clearErrors("url");
+    }
+  }, [activeTab, form]);
+
+  async function onSubmit(values: z.infer<typeof urlFormSchema | typeof textFormSchema>) {
     try {
       setIsLoading(true);
       await convertArticle(values);
@@ -51,7 +66,12 @@ export default function ArticleInput({ onConvert }: { onConvert: () => void }) {
   }
 
   return (
-    <Tabs defaultValue="url" className="w-full">
+    <Tabs 
+      defaultValue="url" 
+      className="w-full" 
+      value={activeTab}
+      onValueChange={(value) => setActiveTab(value as "url" | "text")}
+    >
       <TabsList>
         <TabsTrigger value="url">URL</TabsTrigger>
         <TabsTrigger value="text">Direct Text</TabsTrigger>
@@ -67,8 +87,13 @@ export default function ArticleInput({ onConvert }: { onConvert: () => void }) {
                 <FormItem>
                   <FormLabel>Article URL</FormLabel>
                   <FormControl>
-                    <Input placeholder="https://..." {...field} />
+                    <Input 
+                      placeholder="https://..." 
+                      {...field} 
+                      disabled={isLoading}
+                    />
                   </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -82,8 +107,13 @@ export default function ArticleInput({ onConvert }: { onConvert: () => void }) {
                 <FormItem>
                   <FormLabel>Article Text</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Paste your article text here..." {...field} />
+                    <Textarea 
+                      placeholder="Paste your article text here..." 
+                      {...field}
+                      disabled={isLoading}
+                    />
                   </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />

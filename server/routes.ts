@@ -1,3 +1,4 @@
+// Content remains same except for line 115
 import type { Express } from "express";
 import { db } from "../db";
 import { articles } from "../db/schema";
@@ -111,8 +112,8 @@ export function registerRoutes(app: Express) {
           // Save audio file to disk
           await writeFile(audioPath, audioBuffer);
           
-          // Set audio URL with /public prefix
-          const audioUrl = `/public/audio/${audioFileName}`;
+          // Set audio URL without /public prefix
+          const audioUrl = `/audio/${audioFileName}`;
           
           // Calculate audio duration and file size
           const sampleRate = 44100; // 44.1kHz

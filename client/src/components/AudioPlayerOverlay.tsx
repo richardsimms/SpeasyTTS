@@ -37,17 +37,12 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
   const togglePlay = async () => {
     if (audioRef.current) {
       try {
-        console.log('Current audio state:', isPlaying);
+        console.log('Attempting to toggle playback. Current state:', isPlaying);
+        console.log('Audio element readyState:', audioRef.current.readyState);
+        
         if (isPlaying) {
           await audioRef.current.pause();
         } else {
-          // Ensure audio is loaded
-          if (audioRef.current.readyState === 0) {
-            await new Promise((resolve) => {
-              audioRef.current!.addEventListener('canplaythrough', resolve, { once: true });
-              audioRef.current!.load();
-            });
-          }
           await audioRef.current.play();
         }
         setIsPlaying(!isPlaying);
@@ -55,6 +50,8 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
         console.error('Playback error:', error);
         setIsPlaying(false);
       }
+    } else {
+      console.error('Audio element not initialized');
     }
   };
 
@@ -100,7 +97,13 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
 
   React.useEffect(() => {
     if (audioUrl) {
-      const audio = new Audio(audioUrl);
+      // Ensure proper URL format
+      const fullAudioUrl = audioUrl.startsWith('http') ? audioUrl : `/public${audioUrl}`;
+      const audio = new Audio(fullAudioUrl);
+      
+      // Add debug logging
+      console.log('Initializing audio with URL:', fullAudioUrl);
+      
       audio.addEventListener('timeupdate', handleTimeUpdate);
       audio.addEventListener('loadedmetadata', handleLoadedMetadata);
       audio.addEventListener('ended', () => setIsPlaying(false));
@@ -110,8 +113,8 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
       });
       audioRef.current = audio;
 
-      // Log for debugging
-      console.log('Audio initialized with URL:', audioUrl);
+      // Preload audio
+      audio.load();
 
       return () => {
         if (audioRef.current) {

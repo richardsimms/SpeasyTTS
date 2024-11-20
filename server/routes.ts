@@ -62,8 +62,8 @@ export function registerRoutes(app: Express) {
           // Save audio file to disk
           await writeFile(audioPath, audioBuffer);
           
-          // Set audio URL as public path
-          const audioUrl = `/audio/${audioFileName}`;
+          // Set audio URL with /public prefix
+          const audioUrl = `/public/audio/${audioFileName}`;
           
           // Calculate audio duration and file size
           const sampleRate = 44100; // 44.1kHz

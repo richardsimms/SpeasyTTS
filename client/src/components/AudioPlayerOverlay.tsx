@@ -37,9 +37,17 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
   const togglePlay = async () => {
     if (audioRef.current) {
       try {
+        console.log('Current audio state:', isPlaying);
         if (isPlaying) {
           await audioRef.current.pause();
         } else {
+          // Ensure audio is loaded
+          if (audioRef.current.readyState === 0) {
+            await new Promise((resolve) => {
+              audioRef.current!.addEventListener('canplaythrough', resolve, { once: true });
+              audioRef.current!.load();
+            });
+          }
           await audioRef.current.play();
         }
         setIsPlaying(!isPlaying);
@@ -101,6 +109,9 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
         setIsPlaying(false);
       });
       audioRef.current = audio;
+
+      // Log for debugging
+      console.log('Audio initialized with URL:', audioUrl);
 
       return () => {
         if (audioRef.current) {

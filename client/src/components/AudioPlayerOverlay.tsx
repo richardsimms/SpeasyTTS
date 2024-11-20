@@ -34,14 +34,19 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
   const [duration, setDuration] = useState("0:00");
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
 
-  const togglePlay = () => {
+  const togglePlay = async () => {
     if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current.play();
+      try {
+        if (isPlaying) {
+          await audioRef.current.pause();
+        } else {
+          await audioRef.current.play();
+        }
+        setIsPlaying(!isPlaying);
+      } catch (error) {
+        console.error('Playback error:', error);
+        setIsPlaying(false);
       }
-      setIsPlaying(!isPlaying);
     }
   };
 
@@ -86,19 +91,25 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
   };
 
   React.useEffect(() => {
-    if (audioUrl && !audioRef.current) {
-      audioRef.current = new Audio(audioUrl);
-      audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
-      audioRef.current.addEventListener('loadedmetadata', handleLoadedMetadata);
-      audioRef.current.addEventListener('ended', () => setIsPlaying(false));
+    if (audioUrl) {
+      const audio = new Audio(audioUrl);
+      audio.addEventListener('timeupdate', handleTimeUpdate);
+      audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.addEventListener('ended', () => setIsPlaying(false));
+      audio.addEventListener('error', (e) => {
+        console.error('Audio playback error:', e);
+        setIsPlaying(false);
+      });
+      audioRef.current = audio;
     }
 
     return () => {
       if (audioRef.current) {
+        audioRef.current.pause();
         audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
         audioRef.current.removeEventListener('loadedmetadata', handleLoadedMetadata);
         audioRef.current.removeEventListener('ended', () => setIsPlaying(false));
-        audioRef.current.pause();
+        audioRef.current = null;
       }
     };
   }, [audioUrl]);

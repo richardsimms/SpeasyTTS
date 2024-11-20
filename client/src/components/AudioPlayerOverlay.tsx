@@ -101,17 +101,17 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
         setIsPlaying(false);
       });
       audioRef.current = audio;
-    }
 
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
-        audioRef.current.removeEventListener('loadedmetadata', handleLoadedMetadata);
-        audioRef.current.removeEventListener('ended', () => setIsPlaying(false));
-        audioRef.current = null;
-      }
-    };
+      return () => {
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+          audioRef.current.removeEventListener('loadedmetadata', handleLoadedMetadata);
+          audioRef.current.removeEventListener('ended', () => setIsPlaying(false));
+          audioRef.current = null;
+        }
+      };
+    }
   }, [audioUrl]);
 
   return (

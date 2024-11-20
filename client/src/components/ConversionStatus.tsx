@@ -5,13 +5,16 @@ import { Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { deleteArticle } from "../lib/api";
 import type { Article } from "../../../db/schema";
+import { cn } from "@/lib/utils";
 
 interface ConversionStatusProps {
   article: Article;
   onDelete?: () => void;
+  isSelected?: boolean;
+  onSelect?: () => void;
 }
 
-export default function ConversionStatus({ article, onDelete }: ConversionStatusProps) {
+export default function ConversionStatus({ article, onDelete, isSelected, onSelect }: ConversionStatusProps) {
   const { toast } = useToast();
   
   const getStatusColor = (status: string) => {
@@ -56,7 +59,14 @@ export default function ConversionStatus({ article, onDelete }: ConversionStatus
   };
 
   return (
-    <div className="mb-4">
+    <div 
+      className={cn(
+        "mb-4 p-4 rounded-lg transition-colors cursor-pointer",
+        isSelected ? "bg-accent" : "hover:bg-accent/50",
+        article.status === "completed" ? "cursor-pointer" : "cursor-default"
+      )}
+      onClick={() => article.status === "completed" && onSelect?.()}
+    >
       <div className="flex items-center justify-between mb-2">
         <div className="flex-1 mr-4">
           <h3 className="font-medium truncate">{article.title}</h3>
@@ -68,7 +78,10 @@ export default function ConversionStatus({ article, onDelete }: ConversionStatus
           <Button
             variant="destructive"
             size="icon"
-            onClick={handleDelete}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete();
+            }}
             disabled={article.status === "processing"}
           >
             <Trash2 className="h-4 w-4" />

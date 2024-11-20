@@ -85,9 +85,9 @@ export default function ArticleInput({ onConvert }: { onConvert: () => void }) {
               name="url"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Article URL</FormLabel>
+                  <FormLabel className="text-black dark:text-white">Article URL</FormLabel>
                   <FormControl>
-                    <Input 
+                    <Input className="text-black dark:text-white"
                       placeholder="https://..." 
                       {...field} 
                       disabled={isLoading}
@@ -105,9 +105,9 @@ export default function ArticleInput({ onConvert }: { onConvert: () => void }) {
               name="content"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Article Text</FormLabel>
+                  <FormLabel className="text-black dark:text-white">Article Text</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea className="text-black dark:text-white"
                       placeholder="Paste your article text here..." 
                       {...field}
                       disabled={isLoading}

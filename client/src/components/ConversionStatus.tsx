@@ -1,12 +1,19 @@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { deleteArticle } from "../lib/api";
 import type { Article } from "../../../db/schema";
 
 interface ConversionStatusProps {
   article: Article;
+  onDelete?: () => void;
 }
 
-export default function ConversionStatus({ article }: ConversionStatusProps) {
+export default function ConversionStatus({ article, onDelete }: ConversionStatusProps) {
+  const { toast } = useToast();
+  
   const getStatusColor = (status: string) => {
     switch (status) {
       case "completed":
@@ -31,13 +38,43 @@ export default function ConversionStatus({ article }: ConversionStatusProps) {
     }
   };
 
+  const handleDelete = async () => {
+    try {
+      await deleteArticle(article.id);
+      toast({
+        title: "Success",
+        description: "Article deleted successfully",
+      });
+      onDelete?.();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete article",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="mb-4">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="font-medium truncate">{article.title}</h3>
-        <Badge className={getStatusColor(article.status)}>
-          {article.status}
-        </Badge>
+        <div className="flex-1 mr-4">
+          <h3 className="font-medium truncate">{article.title}</h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge className={getStatusColor(article.status)}>
+            {article.status}
+          </Badge>
+          <Button
+            variant="destructive"
+            size="icon"
+            onClick={handleDelete}
+            disabled={article.status === "processing"}
+          >
+            <Trash2 className="h-4 w-4" />
+            <span className="sr-only">Delete article</span>
+          </Button>
+        </div>
       </div>
       
       <Progress value={getProgress(article.status)} className="h-1" />

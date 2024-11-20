@@ -4,8 +4,9 @@ import { articles } from "../db/schema";
 import { generateSpeech, extractArticle } from "./openai";
 import { generateRssFeed } from "./rss";
 import { eq, max } from "drizzle-orm";
-import { writeFile, mkdir } from "fs/promises";
+import { writeFile, mkdir, unlink } from "fs/promises";
 import { join } from "path";
+import { existsSync } from "fs";
 
 export interface AudioMetadata {
   duration?: number;
@@ -61,8 +62,8 @@ export function registerRoutes(app: Express) {
           // Save audio file to disk
           await writeFile(audioPath, audioBuffer);
           
-          // Set audio URL as public path with /public prefix
-          const audioUrl = `/public/audio/${audioFileName}`;
+          // Set audio URL as public path
+          const audioUrl = `/audio/${audioFileName}`;
           
           // Calculate audio duration and file size
           const sampleRate = 44100; // 44.1kHz
@@ -124,6 +125,40 @@ export function registerRoutes(app: Express) {
       res.json(article);
     } catch (error: any) {
       console.error('Single article fetch error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Delete article endpoint
+  app.delete("/api/articles/:id", async (req, res) => {
+    try {
+      const articleId = parseInt(req.params.id);
+      
+      // Get article before deletion to check audio file
+      const [article] = await db.select()
+        .from(articles)
+        .where(eq(articles.id, articleId));
+      
+      if (!article) {
+        return res.status(404).json({ error: "Article not found" });
+      }
+
+      // Delete the audio file if it exists
+      if (article.audioUrl) {
+        const audioFileName = `${articleId}.mp3`;
+        const audioPath = join(process.cwd(), 'public/audio', audioFileName);
+        
+        if (existsSync(audioPath)) {
+          await unlink(audioPath);
+        }
+      }
+
+      // Delete from database
+      await db.delete(articles).where(eq(articles.id, articleId));
+      
+      res.status(204).send();
+    } catch (error: any) {
+      console.error('Article deletion error:', error);
       res.status(500).json({ error: error.message });
     }
   });

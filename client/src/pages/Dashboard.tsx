@@ -46,7 +46,10 @@ export default function Dashboard() {
               <ScrollArea className="h-[400px]">
                 {articles?.map((article) => (
                   <div key={article.id} className="mb-4">
-                    <ConversionStatus article={article} />
+                    <ConversionStatus 
+                      article={article} 
+                      onDelete={() => mutate()}
+                    />
                     {article.audioUrl && (
                       <AudioPlayer
                         title={article.title}

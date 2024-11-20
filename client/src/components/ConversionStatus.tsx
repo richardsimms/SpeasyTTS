@@ -61,15 +61,15 @@ export default function ConversionStatus({ article, onDelete, isSelected, onSele
   return (
     <div 
       className={cn(
-        "mb-4 p-4 rounded-lg transition-colors cursor-pointer",
-        isSelected ? "bg-accent" : "hover:bg-accent/50",
+        "p-4 rounded-lg transition-colors cursor-pointer",
+        isSelected ? "bg-accent" : "hover:bg-accent/80",
         article.status === "completed" ? "cursor-pointer" : "cursor-default"
       )}
       onClick={() => article.status === "completed" && onSelect?.()}
     >
       <div className="flex items-center justify-between mb-2">
         <div className="flex-1 mr-4">
-          <h3 className="font-medium truncate">{article.title}</h3>
+          <h3 className="font-medium text-ellipsis overflow-hidden">{article.title}</h3>
         </div>
         <div className="flex items-center gap-2">
           <Badge className={getStatusColor(article.status)}>

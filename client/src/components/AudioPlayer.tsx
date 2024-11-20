@@ -10,12 +10,16 @@ interface AudioPlayerProps {
   showWaveform?: boolean;
 }
 
-export default function AudioPlayer({ title, audioUrl, showWaveform = false }: AudioPlayerProps) {
+export default function AudioPlayer({
+  title,
+  audioUrl,
+  showWaveform = false,
+}: AudioPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement>(null);
-  
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -66,25 +70,31 @@ export default function AudioPlayer({ title, audioUrl, showWaveform = false }: A
 
   return (
     <div className="p-4 rounded-lg bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <h3 className="font-medium mb-2 truncate">{title}</h3>
-      
+      <h3 className="font-medium mb-2 text-ellipsis overflow-hidden w-8">
+        {title}
+      </h3>
+
       <audio ref={audioRef} src={audioUrl} />
-      
+
       {showWaveform && <WaveformVisualizer audioUrl={audioUrl} />}
-      
+
       <div className="flex items-center gap-2 mb-2">
         <Button variant="ghost" size="icon" onClick={() => skip(-10)}>
           <SkipBack className="h-4 w-4" />
         </Button>
-        
+
         <Button onClick={togglePlayPause} size="icon">
-          {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          {isPlaying ? (
+            <Pause className="h-4 w-4" />
+          ) : (
+            <Play className="h-4 w-4" />
+          )}
         </Button>
-        
+
         <Button variant="ghost" size="icon" onClick={() => skip(10)}>
           <SkipForward className="h-4 w-4" />
         </Button>
-        
+
         <div className="flex-1 mx-4">
           <Slider
             value={[currentTime]}
@@ -94,7 +104,7 @@ export default function AudioPlayer({ title, audioUrl, showWaveform = false }: A
             onValueChange={handleSliderChange}
           />
         </div>
-        
+
         <span className="text-sm tabular-nums">
           {formatTime(currentTime)} / {formatTime(duration)}
         </span>

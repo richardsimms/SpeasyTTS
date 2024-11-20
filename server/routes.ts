@@ -14,6 +14,43 @@ export interface AudioMetadata {
   error?: string;
 }
 
+// URL validation function
+async function validateUrl(url: string): Promise<{ valid: boolean; error?: string }> {
+  try {
+    // Check URL format
+    const parsedUrl = new URL(url);
+    
+    // Only allow http/https schemes
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      return { valid: false, error: 'Only HTTP and HTTPS URLs are allowed' };
+    }
+
+    // Check if URL is accessible
+    const response = await fetch(url, {
+      method: 'HEAD',
+      headers: { 'User-Agent': 'Speasy-Bot/1.0' }
+    });
+
+    // Accept 200-299 status codes
+    if (!response.ok) {
+      return { valid: false, error: `URL returned status code ${response.status}` };
+    }
+
+    // Check content type if available
+    const contentType = response.headers.get('content-type');
+    if (contentType && !contentType.includes('text/html')) {
+      return { valid: false, error: 'URL must point to an HTML page' };
+    }
+
+    return { valid: true };
+  } catch (error: any) {
+    return { 
+      valid: false, 
+      error: error.message || 'Invalid or inaccessible URL' 
+    };
+  }
+}
+
 export function registerRoutes(app: Express) {
   app.post("/api/articles", async (req, res) => {
     try {
@@ -21,9 +58,21 @@ export function registerRoutes(app: Express) {
       let articleData;
 
       if (url) {
+        // Validate URL before processing
+        const validation = await validateUrl(url);
+        if (!validation.valid) {
+          return res.status(400).json({ 
+            error: validation.error || 'Invalid URL'
+          });
+        }
+
         articleData = await extractArticle(url);
-      } else {
+      } else if (content) {
         articleData = { title: "Custom Text", content };
+      } else {
+        return res.status(400).json({
+          error: "Either URL or content must be provided"
+        });
       }
 
       // Get the latest episode number

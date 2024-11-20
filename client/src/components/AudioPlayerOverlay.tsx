@@ -150,7 +150,7 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
             </Button>
 
             <div className="flex-1">
-              <h3 className="text-sm font-medium truncate">
+              <h3 className="text-sm font-medium text-ellipsis overflow-hidden">
                 {title}
               </h3>
               <div className="text-xs text-muted-foreground">

@@ -45,10 +45,10 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 gap-6">
           <div>
             <ArticleInput onConvert={() => mutate()} />
-            <Card className="mt-6 p-4">
-              <h2 className="text-xl font-semibold mb-4 text-foreground">Recent Conversions</h2>
-              <ScrollArea className="h-[600px]">
+              <h2 className="text-xl font-semibold mb-4 mt-12 text-foreground">Recent Conversions</h2>
+              
                 {articles?.map((article) => (
+            <Card className="mt-6">
                   <ConversionStatus 
                     key={article.id}
                     article={article}
@@ -60,9 +60,9 @@ export default function Dashboard() {
                       }
                     }}
                   />
-                ))}
-              </ScrollArea>
             </Card>
+                ))}
+              
           </div>
         </div>
       </div>

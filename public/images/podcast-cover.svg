@@ -1,0 +1,39 @@
+<svg viewBox="0 0 1400 1400" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1400" height="1400" fill="#1e40af"/>
+  
+  <!-- Abstract wave pattern -->
+  <path d="M0 700 Q 350 600, 700 700 T 1400 700" 
+        fill="none" stroke="#3b82f6" stroke-width="20" opacity="0.6"/>
+  <path d="M0 750 Q 350 650, 700 750 T 1400 750" 
+        fill="none" stroke="#60a5fa" stroke-width="20" opacity="0.4"/>
+  <path d="M0 800 Q 350 700, 700 800 T 1400 800" 
+        fill="none" stroke="#93c5fd" stroke-width="20" opacity="0.2"/>
+  
+  <!-- Sound wave icon -->
+  <g transform="translate(550, 450)">
+    <circle cx="150" cy="150" r="120" fill="#f0f9ff"/>
+    <circle cx="150" cy="150" r="90" fill="#1e40af"/>
+    <circle cx="150" cy="150" r="60" fill="#f0f9ff"/>
+    <circle cx="150" cy="150" r="30" fill="#1e40af"/>
+  </g>
+  
+  <!-- Title -->
+  <text x="700" y="850" 
+        font-family="Arial, sans-serif" 
+        font-size="120" 
+        font-weight="bold" 
+        fill="#ffffff" 
+        text-anchor="middle">
+    SPEASY
+  </text>
+  
+  <!-- Subtitle -->
+  <text x="700" y="950" 
+        font-family="Arial, sans-serif" 
+        font-size="60" 
+        fill="#93c5fd" 
+        text-anchor="middle">
+    Articles to Audio
+  </text>
+</svg>

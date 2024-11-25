@@ -105,12 +105,20 @@ export function registerRoutes(app: Express) {
 
       // Generate speech in background
       generateSpeech(articleData.content)
-        .then(async (audioBuffer) => {
+        .then(async ({ buffer: audioBuffer, validation }) => {
           const audioFileName = `${article.id}.mp3`;
           const audioPath = join(process.cwd(), 'public/audio', audioFileName);
           
           // Save audio file to disk
           await writeFile(audioPath, audioBuffer);
+
+          // Prepare metadata with validation results
+          const metadata = {
+            ...validation.metadata,
+            validationErrors: validation.errors,
+            validationWarnings: validation.warnings,
+            isValidPodcast: validation.isValid
+          };
           
           // Set audio URL without /public prefix
           const audioUrl = `/audio/${audioFileName}`;
@@ -127,8 +135,9 @@ export function registerRoutes(app: Express) {
               audioUrl, 
               status: "completed",
               metadata: {
-                duration: audioDuration,
-                contentLength: contentLength
+                ...metadata,
+                duration: validation.metadata.duration || audioDuration,
+                contentLength: validation.metadata.fileSize || contentLength
               }
             })
             .where(eq(articles.id, article.id));

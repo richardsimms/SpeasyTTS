@@ -99,7 +99,15 @@ async function combineAudioBuffers(audioBuffers: Buffer[]): Promise<Buffer> {
 }
 
 // Main speech generation function that handles chunking
-export async function generateSpeech(text: string): Promise<Buffer> {
+export async function generateSpeech(text: string): Promise<{
+  buffer: Buffer;
+  validation: {
+    isValid: boolean;
+    metadata: any;
+    errors: string[];
+    warnings: string[];
+  };
+}> {
   const chunks = chunkText(text);
   const audioBuffers: Buffer[] = [];
 
@@ -109,13 +117,57 @@ export async function generateSpeech(text: string): Promise<Buffer> {
     audioBuffers.push(audioBuffer);
   }
 
-  // If only one chunk, return it directly
-  if (audioBuffers.length === 1) {
-    return audioBuffers[0];
-  }
+  // Combine audio chunks or use single chunk
+  const combinedBuffer = audioBuffers.length === 1 
+    ? audioBuffers[0] 
+    : await combineAudioBuffers(audioBuffers);
 
-  // Combine audio chunks using FFmpeg
-  return await combineAudioBuffers(audioBuffers);
+  // Create a temporary file for validation
+  const tempDir = "/tmp";
+  const tempFile = join(tempDir, `temp_${randomUUID()}.mp3`);
+  await writeFile(tempFile, combinedBuffer);
+
+  try {
+    // Import validation functions
+    const { validatePodcastAudio, fixAudioIssues } = await import('./audio-validation');
+
+    // Validate the audio
+    const validation = await validatePodcastAudio(tempFile);
+    console.log('Audio validation results:', validation);
+
+    // If there are issues, attempt to fix them
+    if (!validation.isValid) {
+      console.log('Attempting to fix audio issues...');
+      const fixedPath = await fixAudioIssues(tempFile, validation);
+      
+      // Read the fixed file if it's different from the temp file
+      if (fixedPath !== tempFile) {
+        const fixedBuffer = await fs.readFile(fixedPath);
+        await unlink(fixedPath); // Clean up fixed file
+        await unlink(tempFile);  // Clean up temp file
+        
+        // Validate the fixed audio
+        const fixedValidation = await validatePodcastAudio(fixedPath);
+        return { 
+          buffer: fixedBuffer,
+          validation: fixedValidation
+        };
+      }
+    }
+
+    // Return original buffer with validation results
+    return { 
+      buffer: combinedBuffer,
+      validation
+    };
+  } finally {
+    // Clean up temporary file
+    try {
+      await unlink(tempFile);
+    } catch (error) {
+      console.error('Error cleaning up temporary file:', error);
+    }
+  }
 }
 
 import { JSDOM } from 'jsdom';

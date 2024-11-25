@@ -31,9 +31,11 @@ function chunkText(text: string): string[] {
 // Generate speech for a single chunk
 async function generateSpeechChunk(text: string): Promise<Buffer> {
   const response = await openai.audio.speech.create({
-    model: "tts-1",
-    voice: "alloy",
+    model: "tts-1-hd",  // Use HD model for better quality
+    voice: "alloy",     // Keep consistent voice
     input: text,
+    response_format: "mp3",
+    speed: 1.0
   });
 
   return Buffer.from(await response.arrayBuffer());
@@ -70,7 +72,15 @@ async function combineAudioBuffers(audioBuffers: Buffer[]): Promise<Buffer> {
         '-f', 'concat',
         '-safe', '0',
         '-i', inputListFile,
-        '-c', 'copy',
+        '-c:a', 'libmp3lame',
+        '-b:a', '128k',
+        '-ar', '44100',
+        '-ac', '2',
+        '-id3v2_version', '3',
+        '-metadata', 'title=Speasy Podcast',
+        '-metadata', 'artist=Speasy',
+        '-metadata', 'album=Article Audio',
+        '-metadata', 'genre=Podcast',
         outputFile
       ]);
 

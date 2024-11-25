@@ -41,13 +41,38 @@ async function generateSpeechChunk(text: string): Promise<Buffer> {
   return Buffer.from(await response.arrayBuffer());
 }
 
+// Helper function to sanitize title for filenames
+function sanitizeTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '') // Remove special characters
+    .replace(/\s+/g, '-')     // Replace spaces with hyphens
+    .replace(/-+/g, '-')      // Replace multiple hyphens with single hyphen
+    .substring(0, 100);       // Limit length
+}
+
+// Helper function to generate standardized filename
+function generatePodcastFilename(episodeNumber: number, title: string): string {
+  const date = new Date().toISOString().split('T')[0];
+  const sanitizedTitle = sanitizeTitle(title);
+  return `${date}-episode-${episodeNumber}-${sanitizedTitle}.mp3`;
+}
+
 // Combine audio buffers using FFmpeg
-async function combineAudioBuffers(audioBuffers: Buffer[]): Promise<Buffer> {
+async function combineAudioBuffers(
+  audioBuffers: Buffer[], 
+  metadata: {
+    title: string;
+    episodeNumber: number;
+    description?: string;
+    subtitle?: string;
+  }
+): Promise<Buffer> {
   const tempDir = "/tmp";
   const sessionId = randomUUID();
   const inputFiles: string[] = [];
   const inputListFile = join(tempDir, `${sessionId}_list.txt`);
-  const outputFile = join(tempDir, `${sessionId}_output.mp3`);
+  const outputFile = join(tempDir, generatePodcastFilename(metadata.episodeNumber, metadata.title));
 
   try {
     // Write each buffer to a temporary file
@@ -66,7 +91,7 @@ async function combineAudioBuffers(audioBuffers: Buffer[]): Promise<Buffer> {
       );
     }
 
-    // Combine audio files using FFmpeg
+    // Combine audio files using FFmpeg with enhanced metadata
     await new Promise<void>((resolve, reject) => {
       const ffmpeg = spawn('ffmpeg', [
         '-f', 'concat',
@@ -77,10 +102,21 @@ async function combineAudioBuffers(audioBuffers: Buffer[]): Promise<Buffer> {
         '-ar', '44100',
         '-ac', '2',
         '-id3v2_version', '3',
-        '-metadata', 'title=Speasy Podcast',
+        // Basic metadata
+        '-metadata', `title=${metadata.title}`,
         '-metadata', 'artist=Speasy',
-        '-metadata', 'album=Article Audio',
+        '-metadata', 'album=Speasy Podcast',
         '-metadata', 'genre=Podcast',
+        // Podcast-specific metadata
+        '-metadata', 'podcast=true',
+        '-metadata', 'podcast:season=1',
+        '-metadata', `podcast:episode=${metadata.episodeNumber}`,
+        '-metadata', 'podcast:episodeType=full',
+        '-metadata', `itunes:subtitle=${metadata.subtitle || metadata.title}`,
+        '-metadata', `itunes:summary=${metadata.description || ''}`,
+        '-metadata', 'itunes:author=Speasy',
+        '-metadata', 'itunes:category=Technology',
+        '-metadata', 'itunes:explicit=false',
         outputFile
       ]);
 
@@ -109,7 +145,15 @@ async function combineAudioBuffers(audioBuffers: Buffer[]): Promise<Buffer> {
 }
 
 // Main speech generation function that handles chunking
-export async function generateSpeech(text: string): Promise<{
+export async function generateSpeech(
+  text: string,
+  metadata: {
+    title: string;
+    episodeNumber: number;
+    description?: string;
+    subtitle?: string;
+  }
+): Promise<{
   buffer: Buffer;
   validation: {
     isValid: boolean;
@@ -130,7 +174,7 @@ export async function generateSpeech(text: string): Promise<{
   // Combine audio chunks or use single chunk
   const combinedBuffer = audioBuffers.length === 1 
     ? audioBuffers[0] 
-    : await combineAudioBuffers(audioBuffers);
+    : await combineAudioBuffers(audioBuffers, metadata);
 
   // Create a temporary file for validation
   const tempDir = "/tmp";

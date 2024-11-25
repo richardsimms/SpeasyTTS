@@ -104,7 +104,12 @@ export function registerRoutes(app: Express) {
       await mkdir(audioDir, { recursive: true });
 
       // Generate speech in background
-      generateSpeech(articleData.content)
+      generateSpeech(articleData.content, {
+        title: podcastTitle,
+        episodeNumber: nextEpisodeNumber,
+        description: podcastDescription,
+        subtitle: `Episode ${nextEpisodeNumber}: ${podcastTitle}`
+      })
         .then(async ({ buffer: audioBuffer, validation }) => {
           const audioFileName = `${article.id}.mp3`;
           const audioPath = join(process.cwd(), 'public/audio', audioFileName);

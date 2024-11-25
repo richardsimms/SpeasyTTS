@@ -115,24 +115,99 @@ export async function generateSpeech(text: string): Promise<Buffer> {
   return await combineAudioBuffers(audioBuffers);
 }
 
+import { JSDOM } from 'jsdom';
+
+// Clean HTML text content
+function cleanText(text: string): string {
+  return text
+    .replace(/\s+/g, ' ')           // Replace multiple spaces with single space
+    .replace(/\n+/g, '\n')          // Replace multiple newlines with single newline
+    .trim();                        // Remove leading/trailing whitespace
+}
+
+// Extract the main content from HTML
+function extractMainContent(document: Document): string {
+  // Common content selectors
+  const contentSelectors = [
+    'article',
+    '[role="main"]',
+    '.post-content',
+    '.article-content',
+    '.entry-content',
+    'main',
+    '#content',
+    '.content'
+  ];
+
+  let content = '';
+  
+  // Try each selector until we find content
+  for (const selector of contentSelectors) {
+    const element = document.querySelector(selector);
+    if (element) {
+      content = element.textContent || '';
+      if (content.length > 100) { // Ensure we have substantial content
+        break;
+      }
+    }
+  }
+
+  // Fallback: if no content found, try <p> tags in the body
+  if (!content || content.length < 100) {
+    const paragraphs = Array.from(document.querySelectorAll('p'))
+      .map(p => p.textContent)
+      .filter(text => text && text.length > 50) // Filter out short paragraphs
+      .join('\n\n');
+    
+    if (paragraphs.length > content.length) {
+      content = paragraphs;
+    }
+  }
+
+  return cleanText(content);
+}
+
 export async function extractArticle(url: string): Promise<{
   title: string;
   content: string;
 }> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      {
-        role: "system",
-        content: "Extract and clean the main content from the given article URL. Return JSON with title and content.",
-      },
-      {
-        role: "user",
-        content: `Extract content from: ${url}`,
-      },
-    ],
-    response_format: { type: "json_object" },
-  });
+  try {
+    // Fetch the webpage with proper headers
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; SpeasyBot/1.0; +https://speasy.example.com)',
+        'Accept': 'text/html',
+      }
+    });
 
-  return JSON.parse(response.choices[0].message.content);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch article: ${response.status} ${response.statusText}`);
+    }
+
+    const html = await response.text();
+    const dom = new JSDOM(html);
+    const { document } = dom.window;
+
+    // Extract title
+    const title = 
+      document.querySelector('meta[property="og:title"]')?.getAttribute('content') ||
+      document.querySelector('meta[name="twitter:title"]')?.getAttribute('content') ||
+      document.querySelector('h1')?.textContent ||
+      document.title ||
+      'Untitled Article';
+
+    // Extract content
+    const content = extractMainContent(document);
+
+    if (!content || content.length < 100) {
+      throw new Error('Could not extract meaningful content from the article');
+    }
+
+    return {
+      title: cleanText(title),
+      content
+    };
+  } catch (error: any) {
+    throw new Error(`Article extraction failed: ${error.message}`);
+  }
 }

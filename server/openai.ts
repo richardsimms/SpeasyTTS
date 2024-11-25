@@ -57,7 +57,10 @@ async function combineAudioBuffers(audioBuffers: Buffer[]): Promise<Buffer> {
       await writeFile(
         inputListFile,
         `file '${tempFile}'\n`,
-        i === 0 ? 'w' : 'a'
+        {
+          flag: i === 0 ? 'w' : 'a',
+          encoding: 'utf-8'
+        }
       );
     }
 

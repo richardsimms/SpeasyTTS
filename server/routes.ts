@@ -2,7 +2,7 @@
 import type { Express } from "express";
 import { db } from "../db";
 import { articles } from "../db/schema";
-import { generateSpeech, extractArticle } from "./openai";
+import { generateSpeech, extractArticle, generatePodcastFilename } from "./openai";
 import { generateRssFeed } from "./rss";
 import { eq, max } from "drizzle-orm";
 import { writeFile, mkdir, unlink } from "fs/promises";
@@ -111,7 +111,7 @@ export function registerRoutes(app: Express) {
         subtitle: `Episode ${nextEpisodeNumber}: ${podcastTitle}`
       })
         .then(async ({ buffer: audioBuffer, validation }) => {
-          const audioFileName = `${article.id}.mp3`;
+          const audioFileName = generatePodcastFilename(nextEpisodeNumber, podcastTitle);
           const audioPath = join(process.cwd(), 'public/audio', audioFileName);
           
           // Save audio file to disk
@@ -209,7 +209,8 @@ export function registerRoutes(app: Express) {
 
       // Delete the audio file if it exists
       if (article.audioUrl) {
-        const audioFileName = `${articleId}.mp3`;
+        // Get the episode number and title for the podcast filename
+        const audioFileName = generatePodcastFilename(article.episodeNumber, article.podcastTitle || article.title);
         const audioPath = join(process.cwd(), 'public/audio', audioFileName);
         
         if (existsSync(audioPath)) {

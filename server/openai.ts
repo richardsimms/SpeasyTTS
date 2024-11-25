@@ -52,7 +52,7 @@ function sanitizeTitle(title: string): string {
 }
 
 // Helper function to generate standardized filename
-function generatePodcastFilename(episodeNumber: number, title: string): string {
+export function generatePodcastFilename(episodeNumber: number, title: string): string {
   const date = new Date().toISOString().split('T')[0];
   const sanitizedTitle = sanitizeTitle(title);
   return `${date}-episode-${episodeNumber}-${sanitizedTitle}.mp3`;

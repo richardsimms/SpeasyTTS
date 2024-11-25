@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { spawn } from "child_process";
-import { writeFile, unlink } from "fs/promises";
+import { writeFile, unlink, readFile } from "fs/promises";
 import { join } from "path";
 import { randomUUID } from "crypto";
 
@@ -142,7 +142,7 @@ export async function generateSpeech(text: string): Promise<{
       
       // Read the fixed file if it's different from the temp file
       if (fixedPath !== tempFile) {
-        const fixedBuffer = await fs.readFile(fixedPath);
+        const fixedBuffer = await readFile(fixedPath);
         await unlink(fixedPath); // Clean up fixed file
         await unlink(tempFile);  // Clean up temp file
         
@@ -230,13 +230,25 @@ export async function extractArticle(url: string): Promise<{
     // Fetch the webpage with proper headers
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; SpeasyBot/1.0; +https://speasy.example.com)',
-        'Accept': 'text/html',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'DNT': '1'
       }
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch article: ${response.status} ${response.statusText}`);
+      if (response.status === 401) {
+        throw new Error('This article requires authentication. Please try a publicly accessible URL.');
+      } else if (response.status === 403) {
+        throw new Error('Access to this article is forbidden. The website might be blocking automated access.');
+      } else if (response.status === 404) {
+        throw new Error('Article not found. Please check if the URL is correct.');
+      } else {
+        throw new Error(`Failed to fetch article: ${response.status} ${response.statusText}`);
+      }
     }
 
     const html = await response.text();

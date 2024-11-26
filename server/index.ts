@@ -22,6 +22,10 @@ try {
     if (!fs.existsSync(audioDir)) {
       fs.mkdirSync(audioDir, { recursive: true });
     }
+    const imagesDir = join(publicDir, 'images');
+    if (!fs.existsSync(imagesDir)) {
+      fs.mkdirSync(imagesDir, { recursive: true });
+    }
   });
 } catch (error) {
   console.error('Error creating directories:', error);

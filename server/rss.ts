@@ -34,7 +34,7 @@ const CONFIG = {
     },
     article: (id: string) => `${CONFIG.getBaseUrl()}/api/articles/${id}`,
     feed: () => `${CONFIG.getBaseUrl()}/feed.xml`,
-    cover: () => `${CONFIG.getBaseUrl()}/podcast-cover.jpg`,
+    cover: () => `${CONFIG.getBaseUrl()}/public/images/podcast-cover.jpg`,
   },
 };
 

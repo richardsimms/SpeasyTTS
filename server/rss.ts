@@ -12,8 +12,26 @@ const CONFIG = {
 
   // Specific URL generators
   urls: {
-    audio: (path?: string) =>
-      `${CONFIG.getBaseUrl()}/public/audio${path ? `/${path}` : ""}`,
+    audio: (path?: string) => {
+      if (!path) return `${CONFIG.getBaseUrl()}/public/audio`;
+      
+      // Remove any leading/trailing slashes and normalize path
+      const normalizedPath = path
+        .replace(/^[\/\\]+/, '') // Remove leading slashes
+        .replace(/[\/\\]+$/, '') // Remove trailing slashes
+        .replace(/[\/\\]+/g, '/'); // Replace multiple slashes with single slash
+      
+      // If path already contains 'public/audio', don't add it again
+      if (normalizedPath.startsWith('public/audio/') || normalizedPath.startsWith('/public/audio/')) {
+        return `${CONFIG.getBaseUrl()}/${normalizedPath.replace(/^\//, '')}`;
+      }
+      
+      if (normalizedPath.startsWith('audio/')) {
+        return `${CONFIG.getBaseUrl()}/public/${normalizedPath}`;
+      }
+      
+      return `${CONFIG.getBaseUrl()}/public/audio/${normalizedPath}`;
+    },
     article: (id: string) => `${CONFIG.getBaseUrl()}/api/articles/${id}`,
     feed: () => `${CONFIG.getBaseUrl()}/feed.xml`,
     cover: () => `${CONFIG.getBaseUrl()}/podcast-cover.jpg`,

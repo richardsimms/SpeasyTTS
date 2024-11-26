@@ -97,6 +97,10 @@ export function registerRoutes(app: Express) {
         podcastTitle,
         podcastDescription,
         metadata: {}, // Initialize empty metadata as JSONB
+        ogDescription: articleData.ogDescription,
+        ogDescriptionSource: articleData.ogDescriptionSource,
+        ogDescriptionGeneratedAt: new Date(),
+        ogImageUrl: articleData.ogImageUrl
       }).returning();
 
       // Ensure audio directory exists

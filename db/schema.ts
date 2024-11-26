@@ -22,7 +22,12 @@ export const articles = pgTable("articles", {
   podcastTitle: text("podcast_title"),
   podcastDescription: text("podcast_description"),
   episodeNumber: integer("episode_number"),
-  publishedAt: timestamp("published_at")
+  publishedAt: timestamp("published_at"),
+  // OpenGraph metadata fields
+  ogDescription: text("og_description"),
+  ogDescriptionSource: text("og_description_source"),
+  ogDescriptionGeneratedAt: timestamp("og_description_generated_at", { withTimezone: true }),
+  ogImageUrl: text("og_image_url")
 });
 
 export const insertArticleSchema = createInsertSchema(articles);

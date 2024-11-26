@@ -1,0 +1,136 @@
+Objectives
+
+Improve metadata extraction from URLs
+Robust og:description handling
+Download and store Open Graph (og:image) image
+Save image path to PostgreSQL
+Include image in RSS XML feed
+
+Detailed Requirements
+1. OG Description Extraction and Processing
+
+Create a comprehensive description extraction strategy with prioritized sources:
+
+meta[property="og:description"]
+meta[name="description"]
+First paragraph of article content
+Custom truncation/summarization fallback
+
+
+Description Processing Requirements:
+
+Maximum length: 420 characters (ideal for podcast descriptions)
+Trim whitespace
+Remove HTML entities
+Preserve meaningful content
+Add ellipsis (...) if truncated
+
+
+Fallback Description Generation:
+
+If no description found, create a summary using:
+
+First 2-3 sentences of article
+AI-powered summarization (optional)
+
+
+Ensure description provides clear content preview
+
+
+
+2. Enhanced Metadata Extraction Improvements
+
+Existing metadata extraction enhancements:
+
+Canonical URL
+Keywords/tags
+Publication date (with timezone awareness)
+Reading time estimation
+Language of the article
+
+
+
+3. OG Image Handling
+
+[Previous og:image requirements remain the same]
+
+4. PostgreSQL Schema Update
+sqlCopyALTER TABLE articles 
+ADD COLUMN og_description TEXT NULL,
+ADD COLUMN og_description_source VARCHAR(50) NULL, -- e.g., 'og:description', 'meta:description', 'content:summary'
+ADD COLUMN og_description_generated_at TIMESTAMP WITH TIME ZONE NULL;
+5. Description Validation and Cleaning
+
+Implement description sanitization:
+
+Remove HTML tags
+Decode HTML entities
+Limit to printable characters
+Remove excessive whitespace
+Prevent injection attempts
+
+
+
+6. Extraction Code Structure (TypeScript Pseudocode)
+typescriptCopyinterface OgMetadata {
+  description?: string;
+  descriptionSource?: 'og:description' | 'meta:description' | 'content:summary';
+  rawDescription?: string;
+}
+
+function extractOgDescription(document: Document, articleContent: string): OgMetadata {
+  // Priority-based description extraction
+  const sources = [
+    () => document.querySelector('meta[property="og:description"]')?.getAttribute('content'),
+    () => document.querySelector('meta[name="description"]')?.getAttribute('content'),
+    () => extractFirstParagraph(articleContent),
+    () => generateSummary(articleContent)
+  ];
+
+  for (const source of sources) {
+    const description = source();
+    if (description && isValidDescription(description)) {
+      return {
+        description: truncateDescription(description),
+        descriptionSource: getSourceType(source),
+        rawDescription: description
+      };
+    }
+  }
+
+  return {}; // No valid description found
+}
+
+function truncateDescription(description: string, maxLength = 420): string {
+  // Intelligent truncation logic
+  const cleaned = description
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  return cleaned.length > maxLength 
+    ? cleaned.substring(0, maxLength).trim() + '...'
+    : cleaned;
+}
+7. RSS XML Description Handling
+
+Use extracted og:description in RSS feed
+Fallback to truncated article summary
+Ensure description is podcast-friendly and informative
+
+8. Logging and Monitoring
+
+Log description extraction attempts
+Track description source and generation method
+Monitor description quality and fallback frequency
+
+9. Performance and Caching
+
+Implement caching for extracted descriptions
+Use distributed caching (Redis recommended)
+Set appropriate cache expiration
+
+10. Error Handling and Resilience
+
+Graceful handling of missing descriptions
+Provide meaningful logs
+Never break extraction if description is unavailable

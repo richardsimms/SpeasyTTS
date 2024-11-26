@@ -61,8 +61,16 @@ export function generatePodcastFilename(episodeNumber: number, title: string): s
   return `${date}-episode-${episodeNumber}-${sanitizedTitle}.mp3`;
 }
 
-// Enhanced content extraction with better error handling
-export async function extractArticle(url: string): Promise<{ title: string; content: string }> {
+interface ExtractedMetadata {
+  title: string;
+  content: string;
+  ogDescription?: string;
+  ogDescriptionSource?: string;
+  ogImageUrl?: string;
+}
+
+// Enhanced content extraction with better error handling and metadata
+export async function extractArticle(url: string): Promise<ExtractedMetadata> {
   try {
     // Configure fetch headers for better compatibility
     const headers = {
@@ -211,9 +219,52 @@ export async function extractArticle(url: string): Promise<{ title: string; cont
       markdown
     ].filter(Boolean).join('\n');
 
+    // Extract OpenGraph metadata with prioritized sources
+    const ogDescription = 
+      document.querySelector('meta[property="og:description"]')?.getAttribute('content') ||
+      document.querySelector('meta[name="description"]')?.getAttribute('content') ||
+      article.excerpt ||
+      article.content.substring(0, 420).trim() + '...';
+
+    const ogImageUrl = 
+      document.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
+      document.querySelector('meta[name="twitter:image"]')?.getAttribute('content');
+
+    // Determine description source
+    let ogDescriptionSource = 'content:summary';
+    if (document.querySelector('meta[property="og:description"]')?.getAttribute('content')) {
+      ogDescriptionSource = 'og:description';
+    } else if (document.querySelector('meta[name="description"]')?.getAttribute('content')) {
+      ogDescriptionSource = 'meta:description';
+    }
+
+    // Download and store og:image if present
+    let processedImageUrl = ogImageUrl;
+    if (ogImageUrl) {
+      try {
+        // Ensure images directory exists
+        const imagesDir = join(process.cwd(), 'public/images');
+        const imageFileName = `${Date.now()}-${sanitizeTitle(article.title)}.jpg`;
+        const imagePath = join(imagesDir, imageFileName);
+
+        // Download and save image
+        const imageResponse = await fetch(ogImageUrl);
+        if (imageResponse.ok) {
+          const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+          await writeFile(imagePath, imageBuffer);
+          processedImageUrl = `/public/images/${imageFileName}`;
+        }
+      } catch (error) {
+        console.error('Failed to download og:image:', error);
+      }
+    }
+
     return {
       title: metaTags.title || article.title || document.title || 'Untitled Article',
-      content: formattedContent
+      content: formattedContent,
+      ogDescription: ogDescription ? ogDescription.trim() : undefined,
+      ogDescriptionSource,
+      ogImageUrl: processedImageUrl
     };
 
   } catch (error: any) {

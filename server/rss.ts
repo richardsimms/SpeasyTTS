@@ -103,7 +103,7 @@ export function generateRssFeed(articles: Article[]): string {
           <link>${CONFIG.urls.article(article.id)}</link>
           <guid isPermaLink="false">${CONFIG.urls.article(article.id)}</guid>
 
-          <description><![CDATA[${htmlDescription}]]></description>
+          <description><![CDATA[${article.ogDescription || htmlDescription}]]></description>
           <content:encoded><![CDATA[${htmlDescription}]]></content:encoded>
 
           <pubDate>${pubDate}</pubDate>

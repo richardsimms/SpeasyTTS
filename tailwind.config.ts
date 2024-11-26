@@ -5,6 +5,26 @@ export default {
   content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
+      typography: {
+        DEFAULT: {
+          css: {
+            maxWidth: 'none',
+            color: 'inherit',
+            p: {
+              marginTop: '1.25em',
+              marginBottom: '1.25em',
+            },
+            h1: {
+              marginTop: '1.5em',
+              marginBottom: '0.5em',
+            },
+            'ul > li': {
+              marginTop: '0.375em',
+              marginBottom: '0.375em',
+            }
+          }
+        }
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",

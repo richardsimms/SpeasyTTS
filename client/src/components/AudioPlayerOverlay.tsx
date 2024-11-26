@@ -212,16 +212,26 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
           <div className="prose prose-sm max-w-none dark:prose-invert">
             <h4 className="text-lg font-semibold mb-2">Show Notes</h4>
             <div 
-              className="text-muted-foreground max-h-48 overflow-y-auto whitespace-pre-line"
+              className="text-muted-foreground max-h-48 overflow-y-auto space-y-4 whitespace-pre-line"
               dangerouslySetInnerHTML={{ 
-                __html: new Showdown.Converter({
-                  simpleLineBreaks: true,
-                  strikethrough: true,
-                  tables: true,
-                  tasklists: true,
-                  smoothLivePreview: true,
-                  parseImgDimensions: true,
-                }).makeHtml(content) 
+                __html: (() => {
+                  const converter = new Showdown.Converter({
+                    simpleLineBreaks: true,
+                    strikethrough: true,
+                    tables: true,
+                    tasklists: true,
+                    smoothLivePreview: true,
+                    parseImgDimensions: true,
+                    headerLevelStart: 1,
+                    metadata: true
+                  });
+                  
+                  // Add markdown styling options
+                  converter.setOption('simpleLineBreaks', true);
+                  converter.setOption('parseMetadata', true);
+                  
+                  return converter.makeHtml(content);
+                })()
               }}
             />
           </div>

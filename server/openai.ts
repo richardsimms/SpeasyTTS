@@ -3,6 +3,9 @@ import { spawn } from "child_process";
 import { writeFile, unlink, readFile } from "fs/promises";
 import { join } from "path";
 import { randomUUID } from "crypto";
+import { JSDOM } from 'jsdom';
+import { Readability } from '@mozilla/readability';
+import TurndownService from 'turndown';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -31,8 +34,8 @@ function chunkText(text: string): string[] {
 // Generate speech for a single chunk
 async function generateSpeechChunk(text: string): Promise<Buffer> {
   const response = await openai.audio.speech.create({
-    model: "tts-1-hd",  // Use HD model for better quality
-    voice: "alloy",     // Keep consistent voice
+    model: "tts-1-hd",
+    voice: "alloy",
     input: text,
     response_format: "mp3",
     speed: 1.0
@@ -45,10 +48,10 @@ async function generateSpeechChunk(text: string): Promise<Buffer> {
 function sanitizeTitle(title: string): string {
   return title
     .toLowerCase()
-    .replace(/[^\w\s-]/g, '') // Remove special characters
-    .replace(/\s+/g, '-')     // Replace spaces with hyphens
-    .replace(/-+/g, '-')      // Replace multiple hyphens with single hyphen
-    .substring(0, 100);       // Limit length
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .substring(0, 100);
 }
 
 // Helper function to generate standardized filename
@@ -56,6 +59,183 @@ export function generatePodcastFilename(episodeNumber: number, title: string): s
   const date = new Date().toISOString().split('T')[0];
   const sanitizedTitle = sanitizeTitle(title);
   return `${date}-episode-${episodeNumber}-${sanitizedTitle}.mp3`;
+}
+
+// Enhanced content extraction with better error handling
+export async function extractArticle(url: string): Promise<{ title: string; content: string }> {
+  try {
+    // Configure fetch headers for better compatibility
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache',
+      'DNT': '1'
+    };
+
+    // Fetch with timeout and retry logic
+    const fetchWithTimeout = async (url: string, retries = 2) => {
+      const timeout = 10000;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      try {
+        const response = await fetch(url, { headers, signal: controller.signal });
+        clearTimeout(timeoutId);
+        return response;
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        if (retries > 0 && (error.name === 'AbortError' || error.message.includes('ETIMEDOUT'))) {
+          return fetchWithTimeout(url, retries - 1);
+        }
+        throw error;
+      }
+    };
+
+    const response = await fetchWithTimeout(url);
+
+    // Enhanced error handling with specific messages
+    if (!response.ok) {
+      const errorMessages: { [key: number]: string } = {
+        401: 'This article requires authentication. Please try a publicly accessible URL.',
+        403: 'Access forbidden. The website might be blocking automated access.',
+        404: 'Article not found. Please check if the URL is correct.',
+        429: 'Too many requests. Please wait a few minutes and try again.',
+        500: 'Server error. The website might be experiencing issues.',
+        503: 'Service unavailable. The website might be under maintenance.'
+      };
+      throw new Error(errorMessages[response.status] || `Failed to fetch article: ${response.status}`);
+    }
+
+    // Get and sanitize HTML content
+    const html = await response.text();
+    const sanitizedHtml = html
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+      .replace(/ style="[^"]*"/g, '')
+      .replace(/ on\w+="[^"]*"/g, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .trim();
+
+    // Parse HTML with enhanced JSDOM configuration
+    const dom = new JSDOM(sanitizedHtml, {
+      url: url,
+      pretendToBeVisual: true,
+      runScripts: 'outside-only'
+    });
+
+    // Configure Readability with enhanced options
+    const reader = new Readability(dom.window.document, {
+      charThreshold: 100,
+      classesToPreserve: ['article', 'content', 'post'],
+      keepClasses: true,
+      debug: false,
+      nbTopCandidates: 5,
+      maxElemsToParse: 0,
+      weightClasses: true
+    });
+
+    const article = reader.parse();
+    if (!article) {
+      throw new Error('Failed to parse article content. The content might be dynamic or protected.');
+    }
+
+    // Enhanced metadata extraction
+    const document = dom.window.document;
+    const metaTags = {
+      title: document.querySelector('meta[property="og:title"]')?.getAttribute('content') ||
+             document.querySelector('meta[name="twitter:title"]')?.getAttribute('content') ||
+             document.querySelector('meta[name="title"]')?.getAttribute('content'),
+      description: document.querySelector('meta[property="og:description"]')?.getAttribute('content') ||
+                  document.querySelector('meta[name="description"]')?.getAttribute('content'),
+      author: document.querySelector('meta[name="author"]')?.getAttribute('content') ||
+              document.querySelector('meta[property="article:author"]')?.getAttribute('content'),
+      published: document.querySelector('meta[property="article:published_time"]')?.getAttribute('content')
+    };
+
+    // Configure TurndownService with enhanced options
+    const turndownService = new TurndownService({
+      headingStyle: 'atx',
+      hr: '---',
+      bulletListMarker: '-',
+      codeBlockStyle: 'fenced',
+      emDelimiter: '_',
+      strongDelimiter: '**',
+      linkStyle: 'referenced',
+      linkReferenceStyle: 'full'
+    });
+
+    // Add custom rules for better content preservation
+    turndownService.addRule('paragraphSpacing', {
+      filter: 'p',
+      replacement: (content) => '\n\n' + content + '\n\n'
+    });
+
+    turndownService.addRule('preserveLineBreaks', {
+      filter: ['br'],
+      replacement: () => '  \n'
+    });
+
+    turndownService.addRule('nestedLists', {
+      filter: ['li'],
+      replacement: (content, node, options) => {
+        content = content
+          .replace(/^\n+/, '')
+          .replace(/\n+$/, '')
+          .replace(/\n/gm, '\n    ');
+        
+        const prefix = options.bulletListMarker + ' ';
+        const parent = node.parentNode as HTMLElement;
+        const isNested = parent.parentNode?.nodeName.toLowerCase() === 'li';
+        const indent = isNested ? '  ' : '';
+        
+        return indent + prefix + content + (node.nextSibling ? '\n' : '');
+      }
+    });
+
+    // Convert HTML to Markdown with enhanced formatting
+    const markdown = turndownService.turndown(article.content);
+
+    // Validate content length and quality
+    if (!markdown || markdown.length < 100) {
+      throw new Error('Extracted content is too short or empty. The article might be paywalled.');
+    }
+
+    // Format the final content with metadata
+    const formattedContent = [
+      `# ${metaTags.title || article.title || document.title || 'Untitled Article'}`,
+      metaTags.author ? `\nAuthor: ${metaTags.author}` : '',
+      metaTags.published ? `\nPublished: ${new Date(metaTags.published).toLocaleString()}` : '',
+      metaTags.description ? `\n> ${metaTags.description}\n` : '\n',
+      markdown
+    ].filter(Boolean).join('\n');
+
+    return {
+      title: metaTags.title || article.title || document.title || 'Untitled Article',
+      content: formattedContent
+    };
+
+  } catch (error: any) {
+    // Enhanced error categorization
+    const errorMessages: { [key: string]: string } = {
+      TypeError: 'Invalid HTML structure or network error',
+      SyntaxError: 'Invalid HTML content',
+      ECONNREFUSED: 'Could not connect to the website',
+      ETIMEDOUT: 'Connection timed out',
+      SSL: 'SSL/TLS error occurred',
+      AbortError: 'Request timed out'
+    };
+
+    const errorType = Object.keys(errorMessages).find(type => 
+      error instanceof Error && (
+        error.name === type || 
+        error.message.includes(type)
+      )
+    );
+
+    throw new Error(`${errorType ? errorMessages[errorType] : 'Article extraction failed'}: ${error.message}`);
+  }
 }
 
 // Combine audio buffers using FFmpeg
@@ -221,273 +401,5 @@ export async function generateSpeech(
     } catch (error) {
       console.error('Error cleaning up temporary file:', error);
     }
-  }
-}
-
-import { JSDOM } from 'jsdom';
-
-// Clean HTML text content
-function cleanText(text: string): string {
-  return text
-    .replace(/\s+/g, ' ')           // Replace multiple spaces with single space
-    .replace(/\n+/g, '\n')          // Replace multiple newlines with single newline
-    .trim();                        // Remove leading/trailing whitespace
-}
-
-import { Readability } from '@mozilla/readability';
-import TurndownService from 'turndown';
-
-// Utility function to clean and format HTML content
-function cleanHtml(html: string): string {
-  // Remove script and style tags
-  html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-  html = html.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
-  
-  // Remove inline styles and event handlers
-  html = html.replace(/ style="[^"]*"/g, '');
-  html = html.replace(/ on\w+="[^"]*"/g, '');
-  
-  // Remove comments
-  html = html.replace(/<!--[\s\S]*?-->/g, '');
-  
-  return html.trim();
-}
-
-// Custom TurndownService configuration
-function createCustomTurndownService(): TurndownService {
-  const turndownService = new TurndownService({
-    headingStyle: 'atx',
-    hr: '---',
-    bulletListMarker: '-',
-    codeBlockStyle: 'fenced',
-    emDelimiter: '_'
-  });
-
-  // Preserve line breaks
-  turndownService.addRule('lineBreaks', {
-    filter: ['br'],
-    replacement: () => '\n'
-  });
-
-  // Better handling of lists
-  turndownService.addRule('listItems', {
-    filter: ['li'],
-    replacement: function(content, node, options) {
-      content = content
-        .replace(/^\n+/, '') // Remove leading newlines
-        .replace(/\n+$/, '') // Remove trailing newlines
-        .replace(/\n/gm, '\n    '); // Indent wrapped lines
-      
-      const prefix = options.bulletListMarker + ' ';
-      const parent = node.parentNode;
-      const index = Array.prototype.indexOf.call(parent.children, node) + 1;
-      
-      return (
-        prefix + content + (node.nextSibling && !/\n$/.test(content) ? '\n' : '')
-      );
-    }
-  });
-
-  return turndownService;
-}
-
-// Enhanced content extraction
-export async function extractArticle(url: string): Promise<{
-  title: string;
-  content: string;
-}> {
-  try {
-    // Configure fetch headers for better compatibility
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5',
-      'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache',
-      'DNT': '1',
-      'Upgrade-Insecure-Requests': '1'
-    };
-
-    // Fetch with timeout and retry logic
-    const fetchWithTimeout = async (url: string, retries = 2) => {
-      const timeout = 10000; // 10 seconds
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-      try {
-        const response = await fetch(url, { headers, signal: controller.signal });
-        clearTimeout(timeoutId);
-        return response;
-      } catch (error: any) {
-        clearTimeout(timeoutId);
-        if (retries > 0 && (error.name === 'AbortError' || error.message.includes('ETIMEDOUT'))) {
-          return fetchWithTimeout(url, retries - 1);
-        }
-        throw error;
-      }
-    };
-
-    const response = await fetchWithTimeout(url);
-
-    // Enhanced error handling with specific messages
-    if (!response.ok) {
-      const errorMessages: { [key: number]: string } = {
-        401: 'This article requires authentication. Please try a publicly accessible URL.',
-        403: 'Access forbidden. The website might be blocking automated access. Try again later.',
-        404: 'Article not found. Please check if the URL is correct.',
-        429: 'Too many requests. Please wait a few minutes and try again.',
-        500: 'Server error. The website might be experiencing issues.',
-        503: 'Service unavailable. The website might be under maintenance.'
-      };
-      throw new Error(errorMessages[response.status] || 
-        `Failed to fetch article: ${response.status} ${response.statusText}`);
-    }
-
-    // Get and sanitize HTML content
-    const html = await response.text();
-    const sanitizedHtml = html
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-      .replace(/ style="[^"]*"/g, '')
-      .replace(/ on\w+="[^"]*"/g, '')
-      .replace(/<!--[\s\S]*?-->/g, '')
-      .trim();
-
-    // Parse HTML with enhanced JSDOM configuration
-    const dom = new JSDOM(sanitizedHtml, {
-      url: url,
-      pretendToBeVisual: true,
-      runScripts: 'outside-only'
-    });
-
-    // Configure Readability with enhanced options
-    const reader = new Readability(dom.window.document, {
-      charThreshold: 100,
-      classesToPreserve: ['article', 'content', 'post'],
-      keepClasses: true,
-      debug: false,
-      // Additional Readability options for better content detection
-      nbTopCandidates: 5,
-      maxElemsToParse: 0,
-      weightClasses: true
-    });
-
-    const article = reader.parse();
-    if (!article) {
-      throw new Error('Failed to parse article content. The content might be dynamic or protected.');
-    }
-
-    // Enhanced metadata extraction
-    const document = dom.window.document;
-    const metaTags = {
-      title: document.querySelector('meta[property="og:title"]')?.getAttribute('content') ||
-             document.querySelector('meta[name="twitter:title"]')?.getAttribute('content') ||
-             document.querySelector('meta[name="title"]')?.getAttribute('content'),
-      description: document.querySelector('meta[property="og:description"]')?.getAttribute('content') ||
-                  document.querySelector('meta[name="description"]')?.getAttribute('content') ||
-                  document.querySelector('meta[name="twitter:description"]')?.getAttribute('content'),
-      author: document.querySelector('meta[name="author"]')?.getAttribute('content') ||
-              document.querySelector('meta[property="article:author"]')?.getAttribute('content') ||
-              document.querySelector('meta[name="twitter:creator"]')?.getAttribute('content'),
-      published: document.querySelector('meta[property="article:published_time"]')?.getAttribute('content') ||
-                document.querySelector('time[pubdate]')?.getAttribute('datetime')
-    };
-
-    // Configure TurndownService with enhanced options
-    const turndownService = new TurndownService({
-      headingStyle: 'atx',
-      hr: '---',
-      bulletListMarker: '-',
-      codeBlockStyle: 'fenced',
-      emDelimiter: '_',
-      strongDelimiter: '**',
-      linkStyle: 'referenced',
-      linkReferenceStyle: 'full',
-      preformattedCode: true
-    });
-
-    // Add custom rules for better content preservation
-    turndownService.addRule('paragraphSpacing', {
-      filter: 'p',
-      replacement: (content, node) => {
-        return '\n\n' + content + '\n\n';
-      }
-    });
-
-    turndownService.addRule('preserveLineBreaks', {
-      filter: ['br'],
-      replacement: () => '  \n'
-    });
-
-    turndownService.addRule('nestedLists', {
-      filter: ['li'],
-      replacement: (content, node, options) => {
-        content = content
-          .replace(/^\n+/, '')
-          .replace(/\n+$/, '')
-          .replace(/\n/gm, '\n    ');
-        
-        const prefix = options.bulletListMarker + ' ';
-        const parent = node.parentNode as HTMLElement;
-        const isNested = parent.parentNode?.nodeName.toLowerCase() === 'li';
-        const indent = isNested ? '  ' : '';
-        
-        return indent + prefix + content + (node.nextSibling ? '\n' : '');
-      }
-    });
-
-    // Convert to Markdown with enhanced formatting
-    const markdown = turndownService.turndown(article.content);
-
-    // Validate content length and quality
-    if (!markdown || markdown.length < 100) {
-      throw new Error('Extracted content is too short or empty. The article might be paywalled or requires authentication.');
-    }
-
-    // Format the final content with metadata
-    const formattedContent = [
-      `# ${metaTags.title || article.title || document.title || 'Untitled Article'}`,
-      metaTags.author ? `\nAuthor: ${metaTags.author}` : '',
-      metaTags.published ? `\nPublished: ${new Date(metaTags.published).toLocaleString()}` : '',
-      metaTags.description ? `\n> ${metaTags.description}\n` : '\n',
-      markdown
-    ].filter(Boolean).join('\n');
-
-    // Clean and normalize the final output
-    const normalizeText = (text: string) => {
-      return text
-        .replace(/\s+/g, ' ')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim();
-    };
-
-    return {
-      title: normalizeText(metaTags.title || article.title || document.title || 'Untitled Article'),
-      content: formattedContent
-    };
-
-  } catch (error: any) {
-    // Enhanced error categorization and handling
-    const errorMessages: { [key: string]: string } = {
-      TypeError: 'Invalid HTML structure or network error',
-      SyntaxError: 'Invalid HTML content',
-      ECONNREFUSED: 'Could not connect to the website',
-      ETIMEDOUT: 'Connection timed out',
-      SSL: 'SSL/TLS error occurred',
-      AbortError: 'Request timed out'
-    };
-
-    const errorType = Object.keys(errorMessages).find(type => 
-      error instanceof Error && (
-        error.name === type || 
-        error.message.includes(type)
-      )
-    );
-
-    const errorMessage = errorType 
-      ? errorMessages[errorType] 
-      : 'Article extraction failed';
-
-    throw new Error(`${errorMessage}: ${error.message}`);
   }
 }

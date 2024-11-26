@@ -234,48 +234,64 @@ function cleanText(text: string): string {
     .trim();                        // Remove leading/trailing whitespace
 }
 
-// Extract the main content from HTML
-function extractMainContent(document: Document): string {
-  // Common content selectors
-  const contentSelectors = [
-    'article',
-    '[role="main"]',
-    '.post-content',
-    '.article-content',
-    '.entry-content',
-    'main',
-    '#content',
-    '.content'
-  ];
+import { Readability } from '@mozilla/readability';
+import TurndownService from 'turndown';
 
-  let content = '';
+// Utility function to clean and format HTML content
+function cleanHtml(html: string): string {
+  // Remove script and style tags
+  html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  html = html.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
   
-  // Try each selector until we find content
-  for (const selector of contentSelectors) {
-    const element = document.querySelector(selector);
-    if (element) {
-      content = element.textContent || '';
-      if (content.length > 100) { // Ensure we have substantial content
-        break;
-      }
-    }
-  }
-
-  // Fallback: if no content found, try <p> tags in the body
-  if (!content || content.length < 100) {
-    const paragraphs = Array.from(document.querySelectorAll('p'))
-      .map(p => p.textContent)
-      .filter(text => text && text.length > 50) // Filter out short paragraphs
-      .join('\n\n');
-    
-    if (paragraphs.length > content.length) {
-      content = paragraphs;
-    }
-  }
-
-  return cleanText(content);
+  // Remove inline styles and event handlers
+  html = html.replace(/ style="[^"]*"/g, '');
+  html = html.replace(/ on\w+="[^"]*"/g, '');
+  
+  // Remove comments
+  html = html.replace(/<!--[\s\S]*?-->/g, '');
+  
+  return html.trim();
 }
 
+// Custom TurndownService configuration
+function createCustomTurndownService(): TurndownService {
+  const turndownService = new TurndownService({
+    headingStyle: 'atx',
+    hr: '---',
+    bulletListMarker: '-',
+    codeBlockStyle: 'fenced',
+    emDelimiter: '_'
+  });
+
+  // Preserve line breaks
+  turndownService.addRule('lineBreaks', {
+    filter: ['br'],
+    replacement: () => '\n'
+  });
+
+  // Better handling of lists
+  turndownService.addRule('listItems', {
+    filter: ['li'],
+    replacement: function(content, node, options) {
+      content = content
+        .replace(/^\n+/, '') // Remove leading newlines
+        .replace(/\n+$/, '') // Remove trailing newlines
+        .replace(/\n/gm, '\n    '); // Indent wrapped lines
+      
+      const prefix = options.bulletListMarker + ' ';
+      const parent = node.parentNode;
+      const index = Array.prototype.indexOf.call(parent.children, node) + 1;
+      
+      return (
+        prefix + content + (node.nextSibling && !/\n$/.test(content) ? '\n' : '')
+      );
+    }
+  });
+
+  return turndownService;
+}
+
+// Enhanced content extraction
 export async function extractArticle(url: string): Promise<{
   title: string;
   content: string;
@@ -305,30 +321,75 @@ export async function extractArticle(url: string): Promise<{
       }
     }
 
-    const html = await response.text();
+    // Get and clean HTML content
+    let html = await response.text();
+    html = cleanHtml(html);
+
+    // Parse HTML with JSDOM
     const dom = new JSDOM(html);
     const { document } = dom.window;
 
-    // Extract title
-    const title = 
-      document.querySelector('meta[property="og:title"]')?.getAttribute('content') ||
-      document.querySelector('meta[name="twitter:title"]')?.getAttribute('content') ||
-      document.querySelector('h1')?.textContent ||
-      document.title ||
-      'Untitled Article';
+    // Use Readability to extract the main content
+    const reader = new Readability(document, {
+      charThreshold: 100,
+      classesToPreserve: ['article', 'content'],
+      keepClasses: true
+    });
+    
+    const article = reader.parse();
+    
+    if (!article) {
+      throw new Error('Failed to parse article content');
+    }
 
-    // Extract content
-    const content = extractMainContent(document);
+    // Extract metadata
+    const metaTags = {
+      title: document.querySelector('meta[property="og:title"]')?.getAttribute('content') ||
+             document.querySelector('meta[name="twitter:title"]')?.getAttribute('content'),
+      description: document.querySelector('meta[property="og:description"]')?.getAttribute('content') ||
+                  document.querySelector('meta[name="description"]')?.getAttribute('content'),
+      author: document.querySelector('meta[name="author"]')?.getAttribute('content') ||
+              document.querySelector('meta[property="article:author"]')?.getAttribute('content')
+    };
 
-    if (!content || content.length < 100) {
+    // Get the final title
+    const title = metaTags.title || article.title || document.title || 'Untitled Article';
+
+    // Convert HTML to Markdown
+    const turndownService = createCustomTurndownService();
+    const markdown = turndownService.turndown(article.content);
+
+    // Validate content
+    if (!markdown || markdown.length < 100) {
       throw new Error('Could not extract meaningful content from the article');
     }
 
+    // Format the content with metadata
+    const formattedContent = [
+      `# ${title}`,
+      metaTags.author ? `\nAuthor: ${metaTags.author}` : '',
+      metaTags.description ? `\n> ${metaTags.description}\n` : '\n',
+      markdown
+    ].filter(Boolean).join('\n');
+
     return {
       title: cleanText(title),
-      content
+      content: cleanText(formattedContent)
     };
   } catch (error: any) {
-    throw new Error(`Article extraction failed: ${error.message}`);
+    // Enhanced error handling
+    let errorMessage = 'Article extraction failed';
+    
+    if (error instanceof TypeError) {
+      errorMessage = 'Invalid HTML structure or network error';
+    } else if (error.message.includes('ECONNREFUSED')) {
+      errorMessage = 'Could not connect to the website';
+    } else if (error.message.includes('ETIMEDOUT')) {
+      errorMessage = 'Connection timed out';
+    } else if (error.message.includes('SSL')) {
+      errorMessage = 'SSL/TLS error occurred';
+    }
+    
+    throw new Error(`${errorMessage}: ${error.message}`);
   }
 }

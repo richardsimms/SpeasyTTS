@@ -1,5 +1,23 @@
 import { type Article } from "../db/schema";
 import { type AudioMetadata } from "./routes";
+import Showdown from 'showdown';
+
+// Configure Showdown converter with podcast-friendly options
+const converter = new Showdown.Converter({
+  simpleLineBreaks: true,
+  strikethrough: true,
+  tables: true,
+  tasklists: true,
+  metadata: true,
+  openLinksInNewWindow: true,
+  emoji: true,
+  parseImgDimensions: true,
+  smoothLivePreview: true
+});
+
+// Add markdown styling options
+converter.setOption('simpleLineBreaks', true);
+converter.setOption('parseMetadata', true);
 
 // URL configuration object to centralize all URL handling
 const CONFIG = {
@@ -65,13 +83,15 @@ export function generateRssFeed(articles: Article[]): string {
         : CONFIG.urls.audio(article.audioUrl);
 
       // Create a rich HTML description with the full article content
+      // Convert markdown content to HTML
+      const convertedHtml = converter.makeHtml(article.content);
       const htmlDescription = `
-        <div>
+        <div class="podcast-content">
           <h1>${article.podcastTitle || article.title}</h1>
-          ${article.content}
+          ${convertedHtml}
           ${
-            article.sourceUrl
-              ? `<p><a href="${article.sourceUrl}">Read original article</a></p>`
+            article.url
+              ? `<p><a href="${article.url}" target="_blank" rel="noopener">Read original article</a></p>`
               : ""
           }
         </div>

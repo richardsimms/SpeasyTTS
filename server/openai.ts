@@ -238,24 +238,36 @@ export async function extractArticle(url: string): Promise<ExtractedMetadata> {
       ogDescriptionSource = 'meta:description';
     }
 
-    // Download and store og:image if present
+    // Download and convert og:image if present
     let processedImageUrl = ogImageUrl;
     if (ogImageUrl) {
       try {
-        // Ensure images directory exists
-        const imagesDir = join(process.cwd(), 'public/images');
-        const imageFileName = `${Date.now()}-${sanitizeTitle(article.title)}.jpg`;
-        const imagePath = join(imagesDir, imageFileName);
-
-        // Download and save image
+        // Download image
         const imageResponse = await fetch(ogImageUrl);
         if (imageResponse.ok) {
           const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-          await writeFile(imagePath, imageBuffer);
-          processedImageUrl = `/public/images/${imageFileName}`;
+          
+          // Import image processing function
+          const { convertToPodcastShowImage } = await import('./image-processing');
+          
+          // Convert image to podcast format
+          const conversionResult = await convertToPodcastShowImage(
+            imageBuffer,
+            `${sanitizeTitle(article.title)}`
+          );
+          
+          // Use converted image path or fallback to default
+          processedImageUrl = conversionResult.path;
+          
+          // Log conversion results
+          if (conversionResult.error) {
+            console.warn('Image conversion warning:', conversionResult.error);
+          } else {
+            console.log('Image conversion successful:', conversionResult.metadata);
+          }
         }
       } catch (error) {
-        console.error('Failed to download og:image:', error);
+        console.error('Failed to process og:image:', error);
       }
     }
 

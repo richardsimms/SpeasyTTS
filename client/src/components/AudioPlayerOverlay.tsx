@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import Showdown from 'showdown';
 import { 
   Play, 
   Pause, 
@@ -210,9 +211,10 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
           <Separator className="mb-2" />
           <div className="prose prose-sm max-w-none dark:prose-invert">
             <h4 className="text-lg font-semibold mb-2">Show Notes</h4>
-            <div className="text-muted-foreground max-h-48 overflow-y-auto">
-              {content}
-            </div>
+            <div 
+              className="text-muted-foreground max-h-48 overflow-y-auto"
+              dangerouslySetInnerHTML={{ __html: new Showdown.Converter().makeHtml(content) }}
+            />
           </div>
         </div>
       )}

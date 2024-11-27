@@ -73,13 +73,13 @@ export default function ConversionStatus({
       )}
       onClick={() => article.status === "completed" && onSelect?.()}
     >
-      <div className="flex-1 mr-4">
+      <div className="flex-1 mr-2">
         {article.ogImageUrl && (
           <div className="mb-2">
             <img 
               src={article.ogImageUrl} 
               alt={article.title}
-              className="w-full h-32 object-cover rounded-md"
+              className="w-full h-64 object-cover rounded-md"
             />
           </div>
         )}
@@ -92,6 +92,7 @@ export default function ConversionStatus({
           </p>
         )}
       </div>
+      <Progress value={getProgress(article.status)} className="h-1 m-4 w-fill" />
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <Badge className={getStatusColor(article.status)}>
@@ -112,7 +113,6 @@ export default function ConversionStatus({
         </div>
       </div>
 
-      <Progress value={getProgress(article.status)} className="h-1" />
 
       {article.status === "failed" && article.metadata?.error && (
         <p className="text-sm text-red-500 mt-1">{article.metadata.error}</p>

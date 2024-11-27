@@ -3,7 +3,8 @@ import useSWR from "swr";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, Laptop } from "lucide-react";
+import { useTheme } from "../components/ThemeProvider";
 import ArticleInput from "../components/ArticleInput";
 import ConversionStatus from "../components/ConversionStatus";
 import AudioPlayerOverlay from "../components/AudioPlayerOverlay";
@@ -21,11 +22,10 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [mutate]);
 
+  const { theme, setTheme } = useTheme();
+  
   const toggleTheme = () => {
-    const html = document.documentElement;
-    const currentTheme = html.classList.contains("dark") ? "light" : "dark";
-    html.classList.remove("light", "dark");
-    html.classList.add(currentTheme);
+    setTheme(theme === "light" ? "dark" : theme === "dark" ? "system" : "light");
   };
 
   return (
@@ -50,8 +50,9 @@ export default function Dashboard() {
           <path d="M290.328 119.746C288.766 119.746 287.496 119.219 286.52 118.164C285.543 117.148 285.055 115.762 285.055 114.004C285.055 112.363 285.25 110.723 285.641 109.082C286.07 107.48 286.812 105.703 287.867 103.75C288.883 101.797 290.23 99.6094 291.91 97.1875C293.629 94.8047 295.777 91.9922 298.355 88.75L310.074 65.0195C304.215 71.9727 298.902 77.2852 294.137 80.957C289.371 84.6289 284.918 86.4648 280.777 86.4648C279.449 86.4648 278.316 86.1523 277.379 85.5273C276.441 84.9414 275.973 83.9453 275.973 82.5391C275.973 80.5859 276.441 78.3789 277.379 75.918C278.16 74.0039 278.98 72.2266 279.84 70.5859C280.738 68.9062 281.656 67.1484 282.594 65.3125C283.57 63.3594 284.703 60.957 285.992 58.1055C287.281 55.2539 288.707 51.8359 290.27 47.8516C291.051 46.3281 292.066 45.2344 293.316 44.5703C294.566 43.8672 295.777 43.5156 296.949 43.5156C298.16 43.5156 299.176 43.8086 299.996 44.3945C300.855 44.9414 301.285 45.6836 301.285 46.6211C301.285 47.1289 301.207 47.5391 301.051 47.8516L290.328 70.1758C289.781 71.3477 289.508 72.2461 289.508 72.8711C289.508 73.457 289.742 73.75 290.211 73.75C290.641 73.75 291.188 73.5352 291.852 73.1055C292.516 72.6758 293.141 72.1875 293.727 71.6406L317.926 47.8516C319.879 46.2891 321.383 45.332 322.438 44.9805C323.492 44.6289 324.527 44.4531 325.543 44.4531C326.363 44.4531 326.949 44.7656 327.301 45.3906C327.652 45.9766 327.828 46.6016 327.828 47.2656C327.828 47.7734 327.73 48.2812 327.535 48.7891L314.41 76.1523C316.285 74.7461 318.434 73.3789 320.855 72.0508C323.277 70.6836 325.641 69.4531 327.945 68.3594C330.25 67.2656 332.203 66.4062 333.805 65.7812C335.406 65.1172 336.305 64.7852 336.5 64.7852C337.477 64.7852 338.336 65.1562 339.078 65.8984C339.82 66.6406 340.191 67.5781 340.191 68.7109C340.191 69.7266 339.801 70.8008 339.02 71.9336C338.277 73.0664 336.949 74.1602 335.035 75.2148C332.574 76.582 330.23 77.8516 328.004 79.0234C325.816 80.1953 323.98 81.1914 322.496 82.0117L318.336 84.3555C316.461 85.4492 314.723 86.6016 313.121 87.8125C311.559 89.0234 309.977 90.3711 308.375 91.8555C306.656 96.3477 305.035 100.312 303.512 103.75C302.027 107.188 301.109 109.238 300.758 109.902C297.594 116.465 294.117 119.746 290.328 119.746Z"  class="text-foreground fill-current"/>
           </svg>
           <Button variant="ghost" size="icon" onClick={toggleTheme} className="relative">
-            <Sun className="h-5 w-5 rotate-0 scale-100 transition-transform duration-200 dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rotate-90 scale-0 transition-transform duration-200 dark:rotate-0 dark:scale-100 text-foreground" />
+            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all duration-200 dark:absolute dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all duration-200 dark:rotate-0 dark:scale-100" />
+            <Laptop className="absolute h-5 w-5 rotate-90 scale-0 transition-all duration-200 [&:has([data-theme='system'])]:rotate-0 [&:has([data-theme='system'])]:scale-100" />
             <span className="sr-only">Toggle theme</span>
           </Button>
         </div>

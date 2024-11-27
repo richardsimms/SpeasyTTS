@@ -14,9 +14,15 @@ interface ConversionStatusProps {
   onSelect?: () => void;
 }
 
-export default function ConversionStatus({ article, onDelete, isSelected, onSelect }: ConversionStatusProps) {
+export default function ConversionStatus({
+  article,
+
+  onDelete,
+  isSelected,
+  onSelect,
+}: ConversionStatusProps) {
   const { toast } = useToast();
-  
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "completed":
@@ -59,18 +65,34 @@ export default function ConversionStatus({ article, onDelete, isSelected, onSele
   };
 
   return (
-    <div 
+    <div
       className={cn(
         "p-4 rounded-lg transition-colors cursor-pointer",
         isSelected ? "bg-accent" : "hover:bg-accent/80",
-        article.status === "completed" ? "cursor-pointer" : "cursor-default"
+        article.status === "completed" ? "cursor-pointer" : "cursor-default",
       )}
       onClick={() => article.status === "completed" && onSelect?.()}
     >
+      <div className="flex-1 mr-4">
+        {article.ogImageUrl && (
+          <div className="mb-2">
+            <img 
+              src={article.ogImageUrl} 
+              alt={article.title}
+              className="w-full h-32 object-cover rounded-md"
+            />
+          </div>
+        )}
+        <h3 className="font-medium text-ellipsis overflow-hidden">
+          {article.title}
+        </h3>
+        {article.ogDescription && (
+          <p className="text-sm text-muted-foreground mt-1">
+            {article.ogDescription}
+          </p>
+        )}
+      </div>
       <div className="flex items-center justify-between mb-2">
-        <div className="flex-1 mr-4">
-          <h3 className="font-medium text-ellipsis overflow-hidden">{article.title}</h3>
-        </div>
         <div className="flex items-center gap-2">
           <Badge className={getStatusColor(article.status)}>
             {article.status}
@@ -89,13 +111,11 @@ export default function ConversionStatus({ article, onDelete, isSelected, onSele
           </Button>
         </div>
       </div>
-      
+
       <Progress value={getProgress(article.status)} className="h-1" />
-      
+
       {article.status === "failed" && article.metadata?.error && (
-        <p className="text-sm text-red-500 mt-1">
-          {article.metadata.error}
-        </p>
+        <p className="text-sm text-red-500 mt-1">{article.metadata.error}</p>
       )}
     </div>
   );

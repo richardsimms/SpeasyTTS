@@ -76,10 +76,10 @@ export default function ConversionStatus({
       <div className="flex-1 mr-2">
         {article.ogImageUrl && (
           <div className="mb-2">
-            <img 
-              src={article.ogImageUrl} 
+            <img
+              src={article.ogImageUrl}
               alt={article.title}
-              className="w-full h-64 object-cover rounded-md"
+              className="w-full h-84 object-cover rounded-md"
             />
           </div>
         )}
@@ -92,9 +92,11 @@ export default function ConversionStatus({
           </p>
         )}
       </div>
-      <Progress value={getProgress(article.status)} className="h-1 m-4 w-fill" />
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
+      <Progress
+        value={getProgress(article.status)}
+        className="h-1 m-4 w-fill"
+      />
+      <div className="flex justify-between">
           <Badge className={getStatusColor(article.status)}>
             {article.status}
           </Badge>
@@ -109,10 +111,8 @@ export default function ConversionStatus({
           >
             <Trash2 className="h-4 w-4" />
             <span className="sr-only">Delete article</span>
-          </Button>
-        </div>
+          </Button>        
       </div>
-
 
       {article.status === "failed" && article.metadata?.error && (
         <p className="text-sm text-red-500 mt-1">{article.metadata.error}</p>

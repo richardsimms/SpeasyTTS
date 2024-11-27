@@ -82,9 +82,11 @@ export function registerRoutes(app: Express) {
         .from(articles);
       const nextEpisodeNumber = (latestEpisode?.maxEpisode || 0) + 1;
 
-      // Set podcast metadata
+      // Set podcast metadata with enhanced description handling
       const podcastTitle = articleData.title;
-      const podcastDescription = articleData.content.substring(0, 1000) + '...'; // Truncate for description
+      // Use og_description if available, otherwise use title with fallback to truncated content
+      const podcastDescription = articleData.ogDescription || 
+                                `${articleData.title} - ${articleData.content.substring(0, 500)}...`;
       const publishedAt = new Date();
 
       const [article] = await db.insert(articles).values({

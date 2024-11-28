@@ -55,7 +55,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "NODE_ENV=development PUBLIC_URL=http://localhost:5000 tsx server/index.ts"
+args = "NODE_ENV=development tsx watch server/index.ts"
 waitForPort = 5000
 
 [[workflows.workflow]]

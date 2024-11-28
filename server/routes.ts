@@ -26,28 +26,133 @@ async function validateUrl(url: string): Promise<{ valid: boolean; error?: strin
       return { valid: false, error: 'Only HTTP and HTTPS URLs are allowed' };
     }
 
-    // Check if URL is accessible
-    const response = await fetch(url, {
-      method: 'HEAD',
-      headers: { 'User-Agent': 'Speasy-Bot/1.0' }
-    });
+    // Enhanced paywall patterns in URLs
+    const paywallPatterns = [
+      /\/subscribe\//i,
+      /\/subscription\//i,
+      /\/premium\//i,
+      /\/member(s|ship)\//i,
+      /\/signin\//i,
+      /\/login\//i,
+      /\/locked\//i,
+      /\/register\//i,
+      /\/account\//i,
+      /\/subscribers(-|\/)?only/i,
+      /\/paid(-|\/)?content/i,
+      /\/exclusive\//i,
+      /\/(ad)?paywall\//i,
+      /\/upgrade\//i
+    ];
 
-    // Accept 200-299 status codes
-    if (!response.ok) {
-      return { valid: false, error: `URL returned status code ${response.status}` };
+    if (paywallPatterns.some(pattern => pattern.test(parsedUrl.pathname))) {
+      return { 
+        valid: false, 
+        error: 'This appears to be a subscription/premium content URL. Please provide a public article URL.' 
+      };
     }
 
-    // Check content type if available
-    const contentType = response.headers.get('content-type');
-    if (contentType && !contentType.includes('text/html')) {
-      return { valid: false, error: 'URL must point to an HTML page' };
+    // Enhanced headers for better compatibility
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache',
+      'DNT': '1'
+    };
+
+    // First try HEAD request
+    const headResponse = await fetch(url, {
+      method: 'HEAD',
+      headers
+    });
+
+    // Check for authentication/paywall status codes
+    if (headResponse.status === 401 || headResponse.status === 403) {
+      return { 
+        valid: false, 
+        error: 'This content requires authentication. Please provide a publicly accessible article URL.' 
+      };
+    }
+
+    // For other non-200 status codes, try a GET request as some sites block HEAD
+    if (!headResponse.ok) {
+      const getResponse = await fetch(url, {
+        method: 'GET',
+        headers
+      });
+
+      // Common paywall detection in response
+      const text = await getResponse.text();
+      const paywallKeywords = [
+        'subscribe to continue',
+        'subscription required',
+        'premium content',
+        'premium article',
+        'members only',
+        'sign in to read',
+        'login to continue',
+        'create an account',
+        'premium access',
+        'unlock full access',
+        'register to continue',
+        'subscribe now',
+        'exclusive content',
+        'paid subscribers',
+        'subscribe for unlimited access',
+        'premium membership required',
+        'ad-free access',
+        'support quality journalism'
+      ];
+
+      const lowerText = text.toLowerCase();
+      if (paywallKeywords.some(keyword => lowerText.includes(keyword.toLowerCase()))) {
+        return {
+          valid: false,
+          error: 'This article appears to be behind a paywall. Please provide a publicly accessible article.'
+        };
+      }
+
+      // Check for login forms
+      if (text.includes('type="password"') || 
+          (text.includes('type="email"') && text.includes('login'))) {
+        return {
+          valid: false,
+          error: 'This page requires authentication. Please provide a publicly accessible article URL.'
+        };
+      }
+
+      // Check content type if available
+      const contentType = getResponse.headers.get('content-type');
+      if (contentType && !contentType.includes('text/html')) {
+        return { valid: false, error: 'URL must point to an HTML page' };
+      }
+
+      if (!getResponse.ok) {
+        const statusMessages: { [key: number]: string } = {
+          401: 'This content requires authentication.',
+          403: 'Access forbidden. The website might be blocking automated access.',
+          404: 'Article not found. Please check if the URL is correct.',
+          429: 'Too many requests. Please wait a few minutes and try again.',
+          500: 'Server error. The website might be experiencing issues.',
+          503: 'Service unavailable. The website might be under maintenance.'
+        };
+
+        return { 
+          valid: false, 
+          error: statusMessages[getResponse.status] || `URL returned status code ${getResponse.status}`
+        };
+      }
     }
 
     return { valid: true };
   } catch (error: any) {
+    const errorMessage = error.message || 'Invalid or inaccessible URL';
     return { 
       valid: false, 
-      error: error.message || 'Invalid or inaccessible URL' 
+      error: errorMessage.includes('fetch') ? 
+        'Could not access the URL. Please check your internet connection and the URL validity.' : 
+        errorMessage
     };
   }
 }

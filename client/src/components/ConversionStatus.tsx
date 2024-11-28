@@ -114,8 +114,46 @@ export default function ConversionStatus({
           </Button>        
       </div>
 
-      {article.status === "failed" && article.metadata?.error && (
-        <p className="text-sm text-red-500 mt-1">{article.metadata.error}</p>
+      {article.status === "failed" && (
+        <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/10 rounded-md">
+          <p className="text-sm font-medium text-red-600 dark:text-red-400">
+            {article.metadata?.error || "An error occurred during processing"}
+          </p>
+          
+          {/* Enhanced error details */}
+          {article.metadata?.error?.includes('paywall') && (
+            <p className="mt-1 text-sm text-red-500 dark:text-red-400">
+              This article appears to be behind a paywall. Please try:
+              <ul className="list-disc list-inside mt-1 ml-2">
+                <li>Using a different source for the article</li>
+                <li>Checking if a public version is available</li>
+                <li>Using the direct text input method instead</li>
+              </ul>
+            </p>
+          )}
+          
+          {article.metadata?.error?.includes('authentication') && (
+            <p className="mt-1 text-sm text-red-500 dark:text-red-400">
+              This content requires authentication. Consider:
+              <ul className="list-disc list-inside mt-1 ml-2">
+                <li>Using a publicly accessible URL</li>
+                <li>Finding an alternative source</li>
+                <li>Copy-pasting the content directly</li>
+              </ul>
+            </p>
+          )}
+          
+          {article.metadata?.validationErrors?.length > 0 && (
+            <div className="mt-2">
+              <p className="text-sm font-medium text-red-600 dark:text-red-400">Validation Errors:</p>
+              <ul className="mt-1 text-sm text-red-500 dark:text-red-400 list-disc list-inside">
+                {article.metadata.validationErrors.map((error: string, index: number) => (
+                  <li key={index}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

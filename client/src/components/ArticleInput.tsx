@@ -55,9 +55,33 @@ export default function ArticleInput({ onConvert }: { onConvert: () => void }) {
       form.reset();
       onConvert();
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 
+        (error as any)?.response?.data?.error || "Failed to convert article";
+      
+      // Enhanced error message display
+      const displayError = (message: string) => {
+        let enhancedMessage = message;
+        
+        // Add helpful suggestions based on error type
+        if (message.includes('paywall')) {
+          enhancedMessage += '\nTip: Try using a publicly accessible article URL instead.';
+        } else if (message.includes('authentication')) {
+          enhancedMessage += '\nTip: This content requires a login. Please use a public article URL.';
+        } else if (message.includes('403')) {
+          enhancedMessage += '\nTip: The website might be blocking automated access. Try another source.';
+        }
+        
+        return enhancedMessage;
+      };
+      
       toast({
         title: "Error",
-        description: "Failed to convert article",
+        description: displayError(errorMessage),
+        variant: "destructive",
+      });
+      toast({
+        title: "Error",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

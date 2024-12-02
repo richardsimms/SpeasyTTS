@@ -37,11 +37,25 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Fullstack App"
+args = "DB Update"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "DB Update"
+args = "Fullstack App"
+
+[[workflows.workflow]]
+name = "DB Update"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run db:push"
 
 [[workflows.workflow]]
 name = "Fullstack App"
@@ -57,17 +71,3 @@ task = "packager.installForAll"
 task = "shell.exec"
 args = "NODE_ENV=development HOST=0.0.0.0 PORT=5000 tsx server/index.ts"
 waitForPort = 5000
-
-[[workflows.workflow]]
-name = "DB Update"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run db:push"

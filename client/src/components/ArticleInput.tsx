@@ -57,89 +57,15 @@ export default function ArticleInput({ onConvert }: { onConvert: () => void }) {
     } catch (error) {
       const errorMessage = error.response?.data?.error || "Failed to convert article";
       
-      // Enhanced error handling with improved styling and categorization
+      // Enhanced error handling with helpful suggestions
       let toastDescription = errorMessage;
-      
-      // Format error message with enhanced styling and auto-switching
-      if (errorMessage.includes('\n')) {
-        // Split message into title and details
-        const [mainError, ...details] = errorMessage.split('\n');
-        
-        // Format details by type (numbered, bullet points, or suggestions)
-        const formattedDetails = details.reduce((acc, detail) => {
-          const trimmedDetail = detail.trim();
-          if (!trimmedDetail) return acc;
-          
-          if (trimmedDetail.startsWith('•')) {
-            // Handle bullet points
-            if (!acc.bullets) acc.bullets = [];
-            acc.bullets.push(trimmedDetail.replace(/^•\s*/, ''));
-          } else if (/^\d+\./.test(trimmedDetail)) {
-            // Handle numbered points
-            if (!acc.numbered) acc.numbered = [];
-            acc.numbered.push(trimmedDetail.replace(/^\d+\.\s*/, ''));
-          } else if (trimmedDetail.toLowerCase().includes('suggestion')) {
-            // Handle suggestions
-            if (!acc.suggestions) acc.suggestions = [];
-            acc.suggestions.push(trimmedDetail);
-          } else {
-            // Other details
-            if (!acc.other) acc.other = [];
-            acc.other.push(trimmedDetail);
-          }
-          return acc;
-        }, {} as { bullets?: string[], numbered?: string[], suggestions?: string[], other?: string[] });
-
-        toastDescription = (
-          <div className="space-y-3">
-            <p className="font-medium text-base">{mainError}</p>
-            
-            {formattedDetails.numbered && (
-              <div className="space-y-1">
-                <p className="font-medium text-sm">Steps to resolve:</p>
-                <ul className="list-decimal pl-4 space-y-1 text-sm">
-                  {formattedDetails.numbered.map((point, index) => (
-                    <li key={`num-${index}`} className="text-sm">{point}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            
-            {formattedDetails.bullets && (
-              <ul className="list-disc pl-4 space-y-1 text-sm">
-                {formattedDetails.bullets.map((point, index) => (
-                  <li key={`bullet-${index}`} className="text-sm">{point}</li>
-                ))}
-              </ul>
-            )}
-            
-            {formattedDetails.suggestions && (
-              <div className="space-y-1 bg-accent/20 p-2 rounded-md">
-                <p className="font-medium text-sm">Suggestions:</p>
-                <ul className="list-none space-y-1 text-sm">
-                  {formattedDetails.suggestions.map((suggestion, index) => (
-                    <li key={`sug-${index}`} className="text-sm">{suggestion}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            
-            {formattedDetails.other && (
-              <div className="text-sm space-y-1">
-                {formattedDetails.other.map((text, index) => (
-                  <p key={`other-${index}`}>{text}</p>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-
-        // Automatically switch to text input for specific error types
-        if (errorMessage.toLowerCase().match(/(paywall|authentication|forbidden|restricted|subscribe)/)) {
-          setActiveTab("text");
-        }
-      } else {
-        toastDescription = <p className="text-sm">{errorMessage}</p>;
+      if (errorMessage.includes('paywall') || errorMessage.includes('premium') || 
+          errorMessage.includes('subscriber') || errorMessage.includes('authentication')) {
+        toastDescription = `${errorMessage}\n\nTip: Try using the direct text input method instead.`;
+        // Switch to text input tab
+        setActiveTab("text");
+      } else if (errorMessage.includes('URL')) {
+        toastDescription = `${errorMessage}\n\nPlease ensure the URL is complete and starts with http:// or https://`;
       }
       
       toast({

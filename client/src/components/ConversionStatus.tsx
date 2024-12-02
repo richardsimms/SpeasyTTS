@@ -116,112 +116,49 @@ export default function ConversionStatus({
 
       {article.status === "failed" && article.metadata?.error && (
         <div className="mt-2 p-3 bg-destructive/10 rounded-md border border-destructive/20">
-          <p className="text-sm font-medium text-destructive mb-2">Error Converting Article</p>
+          <p className="text-sm font-medium text-destructive mb-1">Error Converting Article</p>
+          <p className="text-sm text-destructive/90">{article.metadata.error}</p>
           
-          {/* Enhanced error message formatting */}
-          <div className="text-sm space-y-3">
-            {article.metadata.error.split('\n').reduce((acc: JSX.Element[], line: string, index: number) => {
-              const trimmedLine = line.trim();
-              if (!trimmedLine) return acc;
-
-              // Handle section headers
-              if (trimmedLine.endsWith(':')) {
-                acc.push(
-                  <p key={`header-${index}`} className="font-medium text-destructive/90 mt-2">
-                    {trimmedLine}
-                  </p>
-                );
-                return acc;
-              }
-
-              // Handle bullet points
-              if (trimmedLine.startsWith('•')) {
-                acc.push(
-                  <div key={`bullet-${index}`} className="flex items-start space-x-2 text-destructive/80">
-                    <span>•</span>
-                    <span>{trimmedLine.substring(1).trim()}</span>
-                  </div>
-                );
-                return acc;
-              }
-
-              // Handle numbered steps
-              if (trimmedLine.match(/^\d+\./)) {
-                acc.push(
-                  <div key={`step-${index}`} className="flex items-start space-x-2 ml-2 text-destructive/80">
-                    <span className="font-medium">{trimmedLine.match(/^\d+\./)![0]}</span>
-                    <span>{trimmedLine.replace(/^\d+\./, '').trim()}</span>
-                  </div>
-                );
-                return acc;
-              }
-
-              // Handle suggestions section
-              if (trimmedLine.toLowerCase().startsWith('suggestion')) {
-                acc.push(
-                  <div key={`suggestions-${index}`} className="bg-accent/20 p-2 rounded-md mt-2">
-                    <p className="font-medium text-destructive/90 mb-1">Suggestions:</p>
-                    <div className="space-y-1 text-destructive/80">
-                      {trimmedLine.replace(/^suggestions:?\s*/i, '').split(',').map((suggestion, i) => (
-                        <p key={`suggestion-${i}`} className="ml-2">• {suggestion.trim()}</p>
-                      ))}
-                    </div>
-                  </div>
-                );
-                return acc;
-              }
-
-              // Regular text
-              acc.push(
-                <p key={`text-${index}`} className="text-destructive/90">
-                  {trimmedLine}
-                </p>
-              );
-              return acc;
-            }, [])}
-          </div>
-
-          {/* Context-specific error handling */}
-          {article.metadata.error.toLowerCase().includes('paywall') && (
-            <div className="mt-3 p-2 bg-accent/20 rounded-md">
-              <p className="text-sm font-medium text-destructive/90">Paywall Detected</p>
-              <p className="text-sm text-destructive/80 mt-1">
-                This article appears to be behind a paywall. Consider:
-              </p>
-              <ul className="list-disc ml-4 mt-1 text-sm text-destructive/80">
-                <li>Using the direct text input method</li>
-                <li>Finding a publicly accessible version</li>
-                <li>Checking for cached or archived versions</li>
+          {/* Enhanced error handling with more specific tips */}
+          {article.metadata.error.includes('paywall') && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Tip: This content is behind a paywall. You can:
+              <ul className="list-disc ml-4 mt-1">
+                <li>Use the direct text input method instead</li>
+                <li>Find a publicly accessible version of this article</li>
+                <li>Try a different article from a non-paywalled source</li>
               </ul>
-            </div>
+            </p>
           )}
-          
-          {article.metadata.error.toLowerCase().includes('authentication') && (
-            <div className="mt-3 p-2 bg-accent/20 rounded-md">
-              <p className="text-sm font-medium text-destructive/90">Authentication Required</p>
-              <p className="text-sm text-destructive/80 mt-1">
-                This content requires authentication. Try:
-              </p>
-              <ul className="list-disc ml-4 mt-1 text-sm text-destructive/80">
-                <li>Using reader mode in your browser</li>
-                <li>Copying the text directly</li>
-                <li>Finding an alternative source</li>
+          {article.metadata.error.includes('authentication') && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Tip: This content requires authentication. You can:
+              <ul className="list-disc ml-4 mt-1">
+                <li>Use the direct text input method</li>
+                <li>Find a public version of the article</li>
+                <li>Make sure you're using a publicly accessible URL</li>
               </ul>
-            </div>
+            </p>
           )}
-
-          {article.metadata.error.includes('rate-limiting') && (
-            <div className="mt-3 p-2 bg-accent/20 rounded-md">
-              <p className="text-sm font-medium text-destructive/90">Rate Limit Detected</p>
-              <p className="text-sm text-destructive/80 mt-1">
-                The website is temporarily blocking access. Try:
-              </p>
-              <ul className="list-disc ml-4 mt-1 text-sm text-destructive/80">
-                <li>Waiting a few minutes before trying again</li>
-                <li>Using the direct text input method</li>
-                <li>Accessing from a different location</li>
+          {article.metadata.error.includes('URL') && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Tip: Please check that:
+              <ul className="list-disc ml-4 mt-1">
+                <li>The URL starts with http:// or https://</li>
+                <li>The website is accessible</li>
+                <li>There are no typos in the URL</li>
               </ul>
-            </div>
+            </p>
+          )}
+          {article.metadata.error.includes('content type') && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Tip: This URL doesn't point to a readable article. Make sure:
+              <ul className="list-disc ml-4 mt-1">
+                <li>The URL points to an actual article page</li>
+                <li>The content is in HTML format</li>
+                <li>You're not linking to a PDF or other file type</li>
+              </ul>
+            </p>
           )}
         </div>
       )}

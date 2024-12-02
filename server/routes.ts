@@ -26,133 +26,210 @@ async function validateUrl(url: string): Promise<{ valid: boolean; error?: strin
       return { valid: false, error: 'Only HTTP and HTTPS URLs are allowed' };
     }
 
-    // Enhanced paywall patterns in URLs
+    // Enhanced paywall patterns with comprehensive detection
     const paywallPatterns = [
-      /\/subscribe\//i,
-      /\/subscription\//i,
-      /\/premium\//i,
-      /\/member(s|ship)\//i,
-      /\/signin\//i,
-      /\/login\//i,
-      /\/locked\//i,
-      /\/register\//i,
-      /\/account\//i,
-      /\/subscribers(-|\/)?only/i,
+      // Subscription patterns
+      /\/subscriber(-|\/)?only/i,
+      /\/premium(-|\/)?content/i,
+      /\/members(-|\/)?only/i,
       /\/paid(-|\/)?content/i,
       /\/exclusive\//i,
       /\/(ad)?paywall\//i,
-      /\/upgrade\//i
+      /\/upgrade\//i,
+      /\/unlock\//i,
+      /\/vip\//i,
+      /\/protected\//i,
+      /\/plus\//i,
+      /\/pro\//i,
+      
+      // Access control patterns
+      /\/access(-|\/)?denied/i,
+      /\/authentication(-|\/)?required/i,
+      /\/restricted(-|\/)?content/i,
+      /\/members(-|\/)?area/i,
+      /\/subscriber(-|\/)?content/i,
+      /\/premium(-|\/)?access/i,
+      
+      // Additional paywall indicators
+      /\/subscribe(-|\/)?to(-|\/)?continue/i,
+      /\/register(-|\/)?to(-|\/)?read/i,
+      /\/subscription(-|\/)?required/i,
+      /\/premium(-|\/)?article/i,
+      /\/premium(-|\/)?story/i,
+      /\/membership(-|\/)?required/i,
+      /\/signin(-|\/)?required/i,
+      /\/login(-|\/)?required/i,
+      /\/subscriber(-|\/)?exclusive/i,
+      
+      // Publication-specific patterns
+      /\/ft\.com\/content/i,  // Financial Times
+      /\/wsj\.com\/articles/i, // Wall Street Journal
+      /\/economist\.com\/\w+\/\d{4}/i, // The Economist
+      /\/nytimes\.com\/\d{4}/i, // New York Times
+      /\/bloomberg\.com\/news/i, // Bloomberg
+      /\/barrons\.com\/articles/i, // Barron's
+      /\/hbr\.org\/\d{4}/i, // Harvard Business Review
+      /\/medium\.com\/membership/i, // Medium membership
+      /\/seekingalpha\.com\/article/i, // Seeking Alpha
+      
+      // Query parameter patterns
+      /\?(.+&)?subscription=/i,
+      /\?(.+&)?paywall=/i,
+      /\?(.+&)?subscribe=/i,
+      /\?(.+&)?premium=/i,
+      /\?(.+&)?membership=/i,
+      
+      // Metered paywall indicators
+      /\/metered(-|\/)?content/i,
+      /\/metered(-|\/)?article/i,
+      /\/remaining(-|\/)?views/i,
+      /\/free-views-remaining/i,
+      /\/article-limit-reached/i
     ];
 
-    if (paywallPatterns.some(pattern => pattern.test(parsedUrl.pathname))) {
+    // Enhanced paywall detection - check both pathname and search parameters
+    const urlString = parsedUrl.pathname + parsedUrl.search;
+    if (paywallPatterns.some(pattern => pattern.test(urlString))) {
       return { 
         valid: false, 
-        error: 'This appears to be a subscription/premium content URL. Please provide a public article URL.' 
+        error: 'This content appears to be behind a paywall. Please:\n' +
+               '1. Use the direct text input method instead\n' +
+               '2. Find a publicly accessible version\n' +
+               '3. Try a different article from a non-paywalled source'
       };
     }
 
-    // Enhanced headers for better compatibility
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5',
-      'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache',
-      'DNT': '1'
-    };
-
-    // First try HEAD request
-    const headResponse = await fetch(url, {
+    // Check if URL is accessible with enhanced error handling
+    const response = await fetch(url, {
       method: 'HEAD',
-      headers
+      headers: { 
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      },
+      redirect: 'follow'
     });
 
-    // Check for authentication/paywall status codes
-    if (headResponse.status === 401 || headResponse.status === 403) {
-      return { 
-        valid: false, 
-        error: 'This content requires authentication. Please provide a publicly accessible article URL.' 
-      };
+    // Enhanced HTTP status code handling with more detailed error messages
+    if (!response.ok) {
+      const status = response.status;
+      const location = response.headers.get('location');
+      
+      // Check if redirected to a login page
+      if (location?.includes('login') || location?.includes('signin')) {
+        return {
+          valid: false,
+          error: 'This content requires authentication. Please:\n' +
+                '1. Use the direct text input method instead\n' +
+                '2. Find a publicly accessible version\n' +
+                '3. Try a different article from a non-paywalled source'
+        };
+      }
+
+      switch (status) {
+        case 401:
+          return { 
+            valid: false, 
+            error: 'This content requires authentication.\n\n' +
+                  'Common reasons:\n' +
+                  '• Login required\n' +
+                  '• Subscription needed\n' +
+                  '• Token expired or invalid\n\n' +
+                  'Steps to resolve:\n' +
+                  '1. Use the direct text input method instead\n' +
+                  '2. Find a publicly accessible version\n' +
+                  '3. Try a different article\n\n' +
+                  'Suggestions:\n' +
+                  '• Copy the article text directly\n' +
+                  '• Look for alternative sources\n' +
+                  '• Check if an archive version exists'
+          };
+        case 403:
+          return { 
+            valid: false, 
+            error: 'Access to this content is forbidden.\n\n' +
+                  'Common reasons:\n' +
+                  '• Paywall protection\n' +
+                  '• Geographic restrictions\n' +
+                  '• Anti-bot measures\n' +
+                  '• Subscription required\n\n' +
+                  'Steps to resolve:\n' +
+                  '1. Switch to direct text input\n' +
+                  '2. Use a publicly accessible version\n' +
+                  '3. Check regional availability\n' +
+                  '4. Try an alternative source\n\n' +
+                  'Suggestions:\n' +
+                  '• Use reader mode in your browser\n' +
+                  '• Check for cached versions\n' +
+                  '• Look for syndicated content'
+          };
+        case 404:
+          return { 
+            valid: false, 
+            error: 'The article could not be found. Please check:\n' +
+                  '1. The URL is typed correctly\n' +
+                  '2. The article hasn\'t been moved or deleted\n' +
+                  '3. You have the correct link'
+          };
+        case 429:
+          return { 
+            valid: false, 
+            error: 'Too many requests. This usually means:\n' +
+                  '1. The website is rate-limiting access\n' +
+                  '2. You need to wait a few minutes before trying again\n' +
+                  '3. Consider using the direct text input method instead'
+          };
+        case 451:
+          return {
+            valid: false,
+            error: 'This content is unavailable for legal reasons. This could be due to:\n' +
+                  '1. Geographic restrictions (region-locked content)\n' +
+                  '2. Copyright claims\n' +
+                  '3. Legal takedown notices\n\n' +
+                  'Try finding an alternative source or use direct text input.'
+          };
+        default:
+          return { 
+            valid: false, 
+            error: `The article is not accessible (Status ${status}). Common solutions:\n` +
+                  '1. Check if the website is working\n' +
+                  '2. Try accessing the URL in your browser first\n' +
+                  '3. Use the direct text input method instead'
+          };
+      }
     }
 
-    // For other non-200 status codes, try a GET request as some sites block HEAD
-    if (!headResponse.ok) {
-      const getResponse = await fetch(url, {
-        method: 'GET',
-        headers
-      });
-
-      // Common paywall detection in response
-      const text = await getResponse.text();
-      const paywallKeywords = [
-        'subscribe to continue',
-        'subscription required',
-        'premium content',
-        'premium article',
-        'members only',
-        'sign in to read',
-        'login to continue',
-        'create an account',
-        'premium access',
-        'unlock full access',
-        'register to continue',
-        'subscribe now',
-        'exclusive content',
-        'paid subscribers',
-        'subscribe for unlimited access',
-        'premium membership required',
-        'ad-free access',
-        'support quality journalism'
-      ];
-
-      const lowerText = text.toLowerCase();
-      if (paywallKeywords.some(keyword => lowerText.includes(keyword.toLowerCase()))) {
-        return {
-          valid: false,
-          error: 'This article appears to be behind a paywall. Please provide a publicly accessible article.'
-        };
-      }
-
-      // Check for login forms
-      if (text.includes('type="password"') || 
-          (text.includes('type="email"') && text.includes('login'))) {
-        return {
-          valid: false,
-          error: 'This page requires authentication. Please provide a publicly accessible article URL.'
-        };
-      }
-
-      // Check content type if available
-      const contentType = getResponse.headers.get('content-type');
-      if (contentType && !contentType.includes('text/html')) {
-        return { valid: false, error: 'URL must point to an HTML page' };
-      }
-
-      if (!getResponse.ok) {
-        const statusMessages: { [key: number]: string } = {
-          401: 'This content requires authentication.',
-          403: 'Access forbidden. The website might be blocking automated access.',
-          404: 'Article not found. Please check if the URL is correct.',
-          429: 'Too many requests. Please wait a few minutes and try again.',
-          500: 'Server error. The website might be experiencing issues.',
-          503: 'Service unavailable. The website might be under maintenance.'
-        };
-
-        return { 
-          valid: false, 
-          error: statusMessages[getResponse.status] || `URL returned status code ${getResponse.status}`
-        };
-      }
+    // Check content type with enhanced validation
+    const contentType = response.headers.get('content-type');
+    if (!contentType) {
+      return { 
+        valid: false, 
+        error: 'Could not determine content type. Please ensure the URL points to an article.' 
+      };
+    }
+    
+    if (!contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) {
+      return { 
+        valid: false, 
+        error: 'URL must point to a web article (HTML content).' 
+      };
     }
 
     return { valid: true };
   } catch (error: any) {
-    const errorMessage = error.message || 'Invalid or inaccessible URL';
+    // Enhanced error messages for common issues
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      return { 
+        valid: false, 
+        error: 'Could not connect to the website. Please check your internet connection and the URL.' 
+      };
+    }
+    
     return { 
       valid: false, 
-      error: errorMessage.includes('fetch') ? 
-        'Could not access the URL. Please check your internet connection and the URL validity.' : 
-        errorMessage
+      error: error.message || 'The URL is invalid or the content is inaccessible.' 
     };
   }
 }

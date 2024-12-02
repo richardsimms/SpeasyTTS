@@ -55,33 +55,96 @@ export default function ArticleInput({ onConvert }: { onConvert: () => void }) {
       form.reset();
       onConvert();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 
-        (error as any)?.response?.data?.error || "Failed to convert article";
+      const errorMessage = error.response?.data?.error || "Failed to convert article";
       
-      // Enhanced error message display
-      const displayError = (message: string) => {
-        let enhancedMessage = message;
+      // Enhanced error handling with improved styling and categorization
+      let toastDescription = errorMessage;
+      
+      // Format error message with enhanced styling and auto-switching
+      if (errorMessage.includes('\n')) {
+        // Split message into title and details
+        const [mainError, ...details] = errorMessage.split('\n');
         
-        // Add helpful suggestions based on error type
-        if (message.includes('paywall')) {
-          enhancedMessage += '\nTip: Try using a publicly accessible article URL instead.';
-        } else if (message.includes('authentication')) {
-          enhancedMessage += '\nTip: This content requires a login. Please use a public article URL.';
-        } else if (message.includes('403')) {
-          enhancedMessage += '\nTip: The website might be blocking automated access. Try another source.';
+        // Format details by type (numbered, bullet points, or suggestions)
+        const formattedDetails = details.reduce((acc, detail) => {
+          const trimmedDetail = detail.trim();
+          if (!trimmedDetail) return acc;
+          
+          if (trimmedDetail.startsWith('•')) {
+            // Handle bullet points
+            if (!acc.bullets) acc.bullets = [];
+            acc.bullets.push(trimmedDetail.replace(/^•\s*/, ''));
+          } else if (/^\d+\./.test(trimmedDetail)) {
+            // Handle numbered points
+            if (!acc.numbered) acc.numbered = [];
+            acc.numbered.push(trimmedDetail.replace(/^\d+\.\s*/, ''));
+          } else if (trimmedDetail.toLowerCase().includes('suggestion')) {
+            // Handle suggestions
+            if (!acc.suggestions) acc.suggestions = [];
+            acc.suggestions.push(trimmedDetail);
+          } else {
+            // Other details
+            if (!acc.other) acc.other = [];
+            acc.other.push(trimmedDetail);
+          }
+          return acc;
+        }, {} as { bullets?: string[], numbered?: string[], suggestions?: string[], other?: string[] });
+
+        toastDescription = (
+          <div className="space-y-3">
+            <p className="font-medium text-base">{mainError}</p>
+            
+            {formattedDetails.numbered && (
+              <div className="space-y-1">
+                <p className="font-medium text-sm">Steps to resolve:</p>
+                <ul className="list-decimal pl-4 space-y-1 text-sm">
+                  {formattedDetails.numbered.map((point, index) => (
+                    <li key={`num-${index}`} className="text-sm">{point}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            {formattedDetails.bullets && (
+              <ul className="list-disc pl-4 space-y-1 text-sm">
+                {formattedDetails.bullets.map((point, index) => (
+                  <li key={`bullet-${index}`} className="text-sm">{point}</li>
+                ))}
+              </ul>
+            )}
+            
+            {formattedDetails.suggestions && (
+              <div className="space-y-1 bg-accent/20 p-2 rounded-md">
+                <p className="font-medium text-sm">Suggestions:</p>
+                <ul className="list-none space-y-1 text-sm">
+                  {formattedDetails.suggestions.map((suggestion, index) => (
+                    <li key={`sug-${index}`} className="text-sm">{suggestion}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            {formattedDetails.other && (
+              <div className="text-sm space-y-1">
+                {formattedDetails.other.map((text, index) => (
+                  <p key={`other-${index}`}>{text}</p>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+
+        // Automatically switch to text input for specific error types
+        if (errorMessage.toLowerCase().match(/(paywall|authentication|forbidden|restricted|subscribe)/)) {
+          setActiveTab("text");
         }
-        
-        return enhancedMessage;
-      };
+      } else {
+        toastDescription = <p className="text-sm">{errorMessage}</p>;
+      }
       
       toast({
         title: "Error",
-        description: displayError(errorMessage),
-        variant: "destructive",
-      });
-      toast({
-        title: "Error",
-        description: errorMessage,
+        description: toastDescription,
         variant: "destructive",
       });
     } finally {
@@ -143,7 +206,7 @@ export default function ArticleInput({ onConvert }: { onConvert: () => void }) {
             />
           </TabsContent>
           
-          <Button type="submit" disabled={isLoading} className="text-white">
+          <Button type="submit" disabled={isLoading} className="text-white dark:text-black">
             {isLoading ? "Converting..." : "Convert to Audio"}
           </Button>
         </form>

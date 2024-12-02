@@ -1,19 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import Showdown from 'showdown';
-import { 
-  Play, 
-  Pause, 
-  SkipForward, 
-  SkipBack, 
-  Volume2, 
+import Showdown from "showdown";
+import {
+  Play,
+  Pause,
+  SkipForward,
+  SkipBack,
+  Volume2,
   VolumeX,
   ChevronDown,
-  ChevronUp
-} from 'lucide-react';
+  ChevronUp,
+} from "lucide-react";
 
 interface AudioPlayerOverlayProps {
   title: string;
@@ -38,9 +38,9 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
   const togglePlay = async () => {
     if (audioRef.current) {
       try {
-        console.log('Attempting to toggle playback. Current state:', isPlaying);
-        console.log('Audio element readyState:', audioRef.current.readyState);
-        
+        console.log("Attempting to toggle playback. Current state:", isPlaying);
+        console.log("Audio element readyState:", audioRef.current.readyState);
+
         if (isPlaying) {
           await audioRef.current.pause();
         } else {
@@ -48,11 +48,11 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
         }
         setIsPlaying(!isPlaying);
       } catch (error) {
-        console.error('Playback error:', error);
+        console.error("Playback error:", error);
         setIsPlaying(false);
       }
     } else {
-      console.error('Audio element not initialized');
+      console.error("Audio element not initialized");
     }
   };
 
@@ -78,7 +78,7 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
   const formatTime = (time: number): string => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
   const handleTimeUpdate = () => {
@@ -99,17 +99,19 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
   React.useEffect(() => {
     if (audioUrl) {
       // Ensure proper URL format
-      const fullAudioUrl = audioUrl.startsWith('http') ? audioUrl : `/public${audioUrl}`;
+      const fullAudioUrl = audioUrl.startsWith("http")
+        ? audioUrl
+        : `/public${audioUrl}`;
       const audio = new Audio(fullAudioUrl);
-      
+
       // Add debug logging
-      console.log('Initializing audio with URL:', fullAudioUrl);
-      
-      audio.addEventListener('timeupdate', handleTimeUpdate);
-      audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.addEventListener('ended', () => setIsPlaying(false));
-      audio.addEventListener('error', (e) => {
-        console.error('Audio playback error:', e);
+      console.log("Initializing audio with URL:", fullAudioUrl);
+
+      audio.addEventListener("timeupdate", handleTimeUpdate);
+      audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.addEventListener("ended", () => setIsPlaying(false));
+      audio.addEventListener("error", (e) => {
+        console.error("Audio playback error:", e);
         setIsPlaying(false);
       });
       audioRef.current = audio;
@@ -120,9 +122,14 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
       return () => {
         if (audioRef.current) {
           audioRef.current.pause();
-          audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
-          audioRef.current.removeEventListener('loadedmetadata', handleLoadedMetadata);
-          audioRef.current.removeEventListener('ended', () => setIsPlaying(false));
+          audioRef.current.removeEventListener("timeupdate", handleTimeUpdate);
+          audioRef.current.removeEventListener(
+            "loadedmetadata",
+            handleLoadedMetadata,
+          );
+          audioRef.current.removeEventListener("ended", () =>
+            setIsPlaying(false),
+          );
           audioRef.current = null;
         }
       };
@@ -130,8 +137,15 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
   }, [audioUrl]);
 
   return (
-    <Card className="fixed inset-x-0 bottom-0 border-t">
+    <Card className="fixed mx-auto max-w-[700px] mx-auto p-6  inset-x-0 bottom-0 border-t">
       <div className="px-4 py-3">
+          <div className="flex items-center space-x-4 flex-1">
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-ellipsis overflow-hidden">
+                {title}
+              </h3>
+            </div>
+          </div>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4 flex-1">
             <Button
@@ -140,10 +154,11 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
               onClick={togglePlay}
               className="hover:bg-accent"
             >
-              {isPlaying ? 
-                <Pause className="h-6 w-6" /> : 
+              {isPlaying ? (
+                <Pause className="h-6 w-6" />
+              ) : (
                 <Play className="h-6 w-6" />
-              }
+              )}
             </Button>
 
             <Button
@@ -154,7 +169,7 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
             >
               <SkipBack className="h-5 w-5" />
             </Button>
-            
+
             <Button
               variant="ghost"
               size="icon"
@@ -163,17 +178,12 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
             >
               <SkipForward className="h-5 w-5" />
             </Button>
-
-            <div className="flex-1">
-              <h3 className="text-sm font-medium text-ellipsis overflow-hidden">
-                {title}
-              </h3>
-              <div className="text-xs text-muted-foreground">
-                {currentTime} / {duration}
-              </div>
+          </div>
+          <div className="flex-1">
+            <div className="text-xs text-muted-foreground">
+              {currentTime} / {duration}
             </div>
           </div>
-
           <div className="flex items-center space-x-4">
             <Button
               variant="ghost"
@@ -181,10 +191,11 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
               onClick={toggleMute}
               className="hover:bg-accent"
             >
-              {isMuted ? 
-                <VolumeX className="h-5 w-5" /> : 
+              {isMuted ? (
+                <VolumeX className="h-5 w-5" />
+              ) : (
                 <Volume2 className="h-5 w-5" />
-              }
+              )}
             </Button>
 
             {content && (
@@ -194,10 +205,11 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
                 onClick={() => setShowNotes(!showNotes)}
                 className="hover:bg-accent"
               >
-                {showNotes ? 
-                  <ChevronDown className="h-5 w-5" /> : 
+                {showNotes ? (
+                  <ChevronDown className="h-5 w-5" />
+                ) : (
                   <ChevronUp className="h-5 w-5" />
-                }
+                )}
               </Button>
             )}
           </div>
@@ -211,9 +223,9 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
           <Separator className="mb-2" />
           <div className="prose prose-sm max-w-none dark:prose-invert">
             <h4 className="text-lg font-semibold mb-2">Show Notes</h4>
-            <div 
-              className="text-muted-foreground max-h-48 overflow-y-auto space-y-4 whitespace-pre-line"
-              dangerouslySetInnerHTML={{ 
+            <div
+              className="text-muted-foreground max-h-64 overflow-y-auto space-y-4 whitespace-pre-line"
+              dangerouslySetInnerHTML={{
                 __html: (() => {
                   const converter = new Showdown.Converter({
                     simpleLineBreaks: true,
@@ -223,15 +235,15 @@ const AudioPlayerOverlay: React.FC<AudioPlayerOverlayProps> = ({
                     smoothLivePreview: true,
                     parseImgDimensions: true,
                     headerLevelStart: 1,
-                    metadata: true
+                    metadata: true,
                   });
-                  
+
                   // Add markdown styling options
-                  converter.setOption('simpleLineBreaks', true);
-                  converter.setOption('parseMetadata', true);
-                  
+                  converter.setOption("simpleLineBreaks", true);
+                  converter.setOption("parseMetadata", true);
+
                   return converter.makeHtml(content);
-                })()
+                })(),
               }}
             />
           </div>

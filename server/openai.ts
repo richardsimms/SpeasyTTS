@@ -9,39 +9,85 @@ import TurndownService from 'turndown';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Function to chunk text into segments under 4000 characters
+// Function to chunk text into segments under OpenAI's limit with safety buffer
 function chunkText(text: string): string[] {
-  const MAX_CHUNK_SIZE = 4000;
+  const MAX_CHUNK_SIZE = 3800; // Buffer for OpenAI's 4096 limit
+  const MIN_CHUNK_SIZE = 100;  // Minimum reasonable chunk size
   const chunks: string[] = [];
   let currentChunk = "";
 
-  // Split text into sentences (basic splitting at periods followed by spaces)
-  const sentences = text.split(/(?<=\.|\?|\!)\s+/);
+  // Enhanced sentence splitting with multiple delimiters
+  const sentences = text.split(/(?<=[.!?])\s+(?=[A-Z])/);
 
   for (const sentence of sentences) {
-    if ((currentChunk + sentence).length <= MAX_CHUNK_SIZE) {
-      currentChunk += (currentChunk ? " " : "") + sentence;
+    // Handle oversized sentences by splitting at commas or natural breaks
+    if (sentence.length > MAX_CHUNK_SIZE) {
+      const subSentences = sentence.split(/(?<=,|\sand\s|\sor\s|\sbut\s|\;)\s+/);
+      for (const subSentence of subSentences) {
+        if (subSentence.length > MAX_CHUNK_SIZE) {
+          // If still too long, force split at MAX_CHUNK_SIZE with word boundaries
+          const words = subSentence.split(/\s+/);
+          let subChunk = "";
+          for (const word of words) {
+            if ((subChunk + " " + word).length <= MAX_CHUNK_SIZE) {
+              subChunk += (subChunk ? " " : "") + word;
+            } else {
+              if (subChunk.length >= MIN_CHUNK_SIZE) chunks.push(subChunk);
+              subChunk = word;
+            }
+          }
+          if (subChunk.length >= MIN_CHUNK_SIZE) chunks.push(subChunk);
+        } else {
+          if ((currentChunk + " " + subSentence).length <= MAX_CHUNK_SIZE) {
+            currentChunk += (currentChunk ? " " : "") + subSentence;
+          } else {
+            if (currentChunk.length >= MIN_CHUNK_SIZE) chunks.push(currentChunk);
+            currentChunk = subSentence;
+          }
+        }
+      }
     } else {
-      if (currentChunk) chunks.push(currentChunk);
-      currentChunk = sentence;
+      if ((currentChunk + " " + sentence).length <= MAX_CHUNK_SIZE) {
+        currentChunk += (currentChunk ? " " : "") + sentence;
+      } else {
+        if (currentChunk.length >= MIN_CHUNK_SIZE) chunks.push(currentChunk);
+        currentChunk = sentence;
+      }
     }
   }
 
-  if (currentChunk) chunks.push(currentChunk);
+  if (currentChunk.length >= MIN_CHUNK_SIZE) chunks.push(currentChunk);
   return chunks;
 }
 
-// Generate speech for a single chunk
+// Generate speech for a single chunk with validation and error handling
 async function generateSpeechChunk(text: string): Promise<Buffer> {
-  const response = await openai.audio.speech.create({
-    model: "tts-1-hd",
-    voice: "alloy",
-    input: text,
-    response_format: "mp3",
-    speed: 1.0
-  });
+  // Validate chunk size before sending to OpenAI
+  if (!text || text.length === 0) {
+    throw new Error("Empty text chunk received");
+  }
+  
+  if (text.length > 4096) {
+    throw new Error(`Chunk size (${text.length}) exceeds OpenAI's limit of 4096 characters`);
+  }
 
-  return Buffer.from(await response.arrayBuffer());
+  try {
+    const response = await openai.audio.speech.create({
+      model: "tts-1-hd",
+      voice: "alloy",
+      input: text,
+      response_format: "mp3",
+      speed: 1.0
+    });
+
+    return Buffer.from(await response.arrayBuffer());
+  } catch (error: any) {
+    // Enhanced error handling with specific messages
+    if (error.message?.includes('string_too_long')) {
+      throw new Error(`Text chunk exceeds OpenAI's character limit. Length: ${text.length}`);
+    }
+    throw new Error(`Speech generation failed: ${error.message}`);
+  }
 }
 
 // Helper function to sanitize title for filenames

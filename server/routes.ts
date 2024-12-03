@@ -240,6 +240,8 @@ export function registerRoutes(app: Express) {
       const { url, content } = req.body;
       let articleData;
 
+      const MAX_CONTENT_LENGTH = 100000; // Maximum content length allowed
+      
       if (url) {
         // Validate URL before processing
         const validation = await validateUrl(url);
@@ -250,7 +252,20 @@ export function registerRoutes(app: Express) {
         }
 
         articleData = await extractArticle(url);
+        
+        // Validate extracted content length
+        if (articleData.content.length > MAX_CONTENT_LENGTH) {
+          return res.status(400).json({
+            error: `Article content is too long. Maximum allowed length is ${MAX_CONTENT_LENGTH} characters.`
+          });
+        }
       } else if (content) {
+        // Validate direct input content length
+        if (content.length > MAX_CONTENT_LENGTH) {
+          return res.status(400).json({
+            error: `Article content is too long. Maximum allowed length is ${MAX_CONTENT_LENGTH} characters.`
+          });
+        }
         articleData = { title: "Custom Text", content };
       } else {
         return res.status(400).json({

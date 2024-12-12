@@ -26,8 +26,15 @@ async function validateUrl(url: string): Promise<{ valid: boolean; error?: strin
       return { valid: false, error: 'Only HTTP and HTTPS URLs are allowed' };
     }
 
-    // Enhanced paywall patterns with comprehensive detection
-    const paywallPatterns = [
+    // Enhanced paywall and authentication patterns with comprehensive detection
+    const restrictedPatterns = [
+      // Web-share and authentication patterns
+      /app\.sparkmailapp\.com\/web-share/i,
+      /\/shared\/view/i,
+      /\/shared-content/i,
+      /\/web-share/i,
+      /\/auth(-|\/)?required/i,
+      
       // Subscription patterns
       /\/subscriber(-|\/)?only/i,
       /\/premium(-|\/)?content/i,
@@ -89,7 +96,20 @@ async function validateUrl(url: string): Promise<{ valid: boolean; error?: strin
 
     // Enhanced paywall detection - check both pathname and search parameters
     const urlString = parsedUrl.pathname + parsedUrl.search;
-    if (paywallPatterns.some(pattern => pattern.test(urlString))) {
+    
+    // Check for web-share URLs first
+    if (parsedUrl.hostname.includes('sparkmailapp.com') || /web-share|shared/.test(urlString)) {
+      return {
+        valid: false,
+        error: 'This appears to be a web-share or email preview link that requires authentication.\n\n' +
+               'To fix this:\n' +
+               '1. Copy the actual article text and use the direct text input method\n' +
+               '2. Find and use the original article URL instead\n' +
+               '3. Make sure you\'re using a publicly accessible URL'
+      };
+    }
+    
+    if (restrictedPatterns.some(pattern => pattern.test(urlString))) {
       return { 
         valid: false, 
         error: 'This content appears to be behind a paywall. Please:\n' +

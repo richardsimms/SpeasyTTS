@@ -126,9 +126,19 @@ export async function extractArticle(url: string): Promise<ExtractedMetadata> {
     
     let browser;
     try {
-      // Launch browser with enhanced options
+      // Launch browser with minimal requirements
       browser = await chromium.launch({
-        headless: true
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--disable-software-rasterizer',
+          '--disable-extensions',
+          '--single-process',
+          '--no-zygote'
+        ]
       });
       
       const context = await browser.newContext({

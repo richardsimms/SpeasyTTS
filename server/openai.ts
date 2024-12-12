@@ -14,50 +14,69 @@ function chunkText(text: string): string[] {
   const MAX_CHUNK_SIZE = 3800; // Buffer for OpenAI's 4096 limit
   const MIN_CHUNK_SIZE = 100;  // Minimum reasonable chunk size
   const chunks: string[] = [];
-  let currentChunk = "";
-
-  // Enhanced sentence splitting with multiple delimiters
-  const sentences = text.split(/(?<=[.!?])\s+(?=[A-Z])/);
-
-  for (const sentence of sentences) {
-    // Handle oversized sentences by splitting at commas or natural breaks
-    if (sentence.length > MAX_CHUNK_SIZE) {
-      const subSentences = sentence.split(/(?<=,|\sand\s|\sor\s|\sbut\s|\;)\s+/);
-      for (const subSentence of subSentences) {
-        if (subSentence.length > MAX_CHUNK_SIZE) {
-          // If still too long, force split at MAX_CHUNK_SIZE with word boundaries
-          const words = subSentence.split(/\s+/);
-          let subChunk = "";
-          for (const word of words) {
-            if ((subChunk + " " + word).length <= MAX_CHUNK_SIZE) {
-              subChunk += (subChunk ? " " : "") + word;
+  
+  // First, split into paragraphs
+  const paragraphs = text.split(/\n\s*\n/);
+  
+  for (const paragraph of paragraphs) {
+    if (paragraph.trim().length === 0) continue;
+    
+    if (paragraph.length <= MAX_CHUNK_SIZE) {
+      // If paragraph fits in a chunk, add it
+      chunks.push(paragraph.trim());
+    } else {
+      // Split paragraph into sentences
+      const sentences = paragraph.match(/[^.!?]+[.!?]+/g) || [paragraph];
+      let currentChunk = "";
+      
+      for (const sentence of sentences) {
+        const trimmedSentence = sentence.trim();
+        
+        if (trimmedSentence.length > MAX_CHUNK_SIZE) {
+          // Handle very long sentences by splitting at natural breaks
+          const parts = trimmedSentence.split(/(?<=,|\sand\s|\sor\s|\sbut\s|\;)\s+/);
+          for (const part of parts) {
+            if (part.length <= MAX_CHUNK_SIZE) {
+              chunks.push(part.trim());
             } else {
-              if (subChunk.length >= MIN_CHUNK_SIZE) chunks.push(subChunk);
-              subChunk = word;
+              // If still too long, split by words
+              const words = part.split(/\s+/);
+              let wordChunk = "";
+              for (const word of words) {
+                if ((wordChunk + " " + word).length <= MAX_CHUNK_SIZE) {
+                  wordChunk += (wordChunk ? " " : "") + word;
+                } else {
+                  if (wordChunk.length >= MIN_CHUNK_SIZE) {
+                    chunks.push(wordChunk.trim());
+                  }
+                  wordChunk = word;
+                }
+              }
+              if (wordChunk.length >= MIN_CHUNK_SIZE) {
+                chunks.push(wordChunk.trim());
+              }
             }
           }
-          if (subChunk.length >= MIN_CHUNK_SIZE) chunks.push(subChunk);
+        } else if ((currentChunk + " " + trimmedSentence).length <= MAX_CHUNK_SIZE) {
+          // Add to current chunk
+          currentChunk += (currentChunk ? " " : "") + trimmedSentence;
         } else {
-          if ((currentChunk + " " + subSentence).length <= MAX_CHUNK_SIZE) {
-            currentChunk += (currentChunk ? " " : "") + subSentence;
-          } else {
-            if (currentChunk.length >= MIN_CHUNK_SIZE) chunks.push(currentChunk);
-            currentChunk = subSentence;
+          // Start new chunk
+          if (currentChunk.length >= MIN_CHUNK_SIZE) {
+            chunks.push(currentChunk.trim());
           }
+          currentChunk = trimmedSentence;
         }
       }
-    } else {
-      if ((currentChunk + " " + sentence).length <= MAX_CHUNK_SIZE) {
-        currentChunk += (currentChunk ? " " : "") + sentence;
-      } else {
-        if (currentChunk.length >= MIN_CHUNK_SIZE) chunks.push(currentChunk);
-        currentChunk = sentence;
+      
+      // Add remaining chunk
+      if (currentChunk.length >= MIN_CHUNK_SIZE) {
+        chunks.push(currentChunk.trim());
       }
     }
   }
-
-  if (currentChunk.length >= MIN_CHUNK_SIZE) chunks.push(currentChunk);
-  return chunks;
+  
+  return chunks.filter(chunk => chunk.length >= MIN_CHUNK_SIZE);
 }
 
 // Generate speech for a single chunk with validation and error handling
@@ -115,136 +134,76 @@ interface ExtractedMetadata {
   ogImageUrl?: string;
 }
 
-// Enhanced content extraction with Puppeteer and better error handling
+// Enhanced content extraction with JSDOM and better error handling
 export async function extractArticle(url: string): Promise<ExtractedMetadata> {
   try {
-    // Import playwright
-    const { chromium } = await import('playwright');
+    console.log('Fetching content from URL:', url);
     
-    // Launch browser with enhanced stealth mode
-    console.log('Launching Playwright browser for URL:', url);
-    
-    let browser;
-    try {
-      // Launch browser with minimal requirements
-      browser = await chromium.launch({
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--disable-software-rasterizer',
-          '--disable-extensions',
-          '--single-process',
-          '--no-zygote'
-        ]
-      });
-      
-      const context = await browser.newContext({
-        viewport: { width: 1920, height: 1080 },
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        extraHTTPHeaders: {
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'DNT': '1',
-          'Upgrade-Insecure-Requests': '1'
-        }
-      });
-
-      const page = await context.newPage();
-      
-      console.log('Attempting to navigate to URL:', url);
-      
-      // Enhanced navigation with authentication handling
-      const response = await page.goto(url, {
-        waitUntil: ['networkidle0', 'domcontentloaded'],
-        timeout: 30000
-      });
-
-      console.log('Navigation response status:', response?.status());
-      console.log('Current page URL:', page.url());
-
-      // Check if we were redirected to a login page
-      const currentUrl = page.url().toLowerCase();
-      console.log('Final URL after potential redirects:', currentUrl);
-      
-      if (currentUrl.includes('login') || currentUrl.includes('signin') || currentUrl.includes('auth')) {
-        throw new Error(
-          'This content requires authentication. Please try one of these methods:\n' +
-          '1. Wait a few minutes and try again (if rate-limited)\n' +
-          '2. Copy the article text and use the direct text input method\n' +
-          '3. Find the original article URL instead of the web-share link'
-        );
+    // Fetch the webpage content
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
       }
-      
-      // Check if the page loaded successfully
-      const mainContent = await page.$('body');
-      if (!mainContent) {
-        throw new Error('Could not load the article content. The page might be protected or require authentication.');
-      }
-      
-      // Check for common error messages or blocking elements
-      const errorTexts = await page.$$eval('*', (elements) => {
-        return elements
-          .map(el => el.textContent)
-          .filter(text => text && (
-            text.includes('Access Denied') ||
-            text.includes('Login Required') ||
-            text.includes('Authentication Required') ||
-            text.includes('Please sign in')
-          ));
-      });
-      
-      if (errorTexts.length > 0) {
-        throw new Error(
-          'Access to this content is restricted. Please try:\n' +
-          '1. Using the direct text input method\n' +
-          '2. Finding the original article URL\n' +
-          '3. Ensuring you have proper access rights'
-        );
-      }
-
-      // Wait for potential JavaScript redirects
-      await page.waitForTimeout(2000);
-      
-      // Wait for main content to load
-      await page.waitForSelector('body', { timeout: 10000 });
-      
-      // Get the page content
-      const content = await page.content();
-
-    // Enhanced error handling with specific messages
-    if (!response.ok) {
-      const errorMessages: { [key: number]: string } = {
-        401: 'This article requires authentication. Please try a publicly accessible URL.',
-        403: 'Access forbidden. The website might be blocking automated access.',
-        404: 'Article not found. Please check if the URL is correct.',
-        429: 'Too many requests. Please wait a few minutes and try again.',
-        500: 'Server error. The website might be experiencing issues.',
-        503: 'Service unavailable. The website might be under maintenance.'
-      };
-      throw new Error(errorMessages[response.status] || `Failed to fetch article: ${response.status}`);
-    }
-
-    // Sanitize the obtained content
-    const sanitizedHtml = content
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-      .replace(/ style="[^"]*"/g, '')
-      .replace(/ on\w+="[^"]*"/g, '')
-      .replace(/<!--[\s\S]*?-->/g, '')
-      .trim();
-
-    // Parse HTML with enhanced JSDOM configuration
-    const dom = new JSDOM(sanitizedHtml, {
-      url: url,
-      pretendToBeVisual: true,
-      runScripts: 'outside-only'
     });
 
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const html = await response.text();
+    
+    // Parse HTML with enhanced JSDOM configuration
+    const dom = new JSDOM(html, {
+      url: url,
+      contentType: "text/html",
+      pretendToBeVisual: true,
+      resources: "usable"
+    });
+
+    // Check for authentication redirects
+    const finalUrl = response.url.toLowerCase();
+    if (finalUrl.includes('login') || finalUrl.includes('signin') || finalUrl.includes('auth')) {
+      throw new Error(
+        'This content requires authentication. Please try one of these methods:\n' +
+        '1. Wait a few minutes and try again (if rate-limited)\n' +
+        '2. Copy the article text and use the direct text input method\n' +
+        '3. Find the original article URL instead of the web-share link'
+      );
+    }
+
+    // Check for error messages in the content
+    const document = dom.window.document;
+    const bodyText = document.body.textContent || '';
+    const errorPatterns = [
+      'Access Denied',
+      'Login Required',
+      'Authentication Required',
+      'Please sign in',
+      'Subscribe to continue',
+      'Premium content'
+    ];
+
+    if (errorPatterns.some(pattern => bodyText.includes(pattern))) {
+      throw new Error(
+        'Access to this content is restricted. Please try:\n' +
+        '1. Using the direct text input method\n' +
+        '2. Finding the original article URL\n' +
+        '3. Ensuring you have proper access rights'
+      );
+    }
+
+    // Clean up the DOM before extraction
+    const scripts = document.getElementsByTagName('script');
+    const styles = document.getElementsByTagName('style');
+    Array.from(scripts).forEach(script => script.remove());
+    Array.from(styles).forEach(style => style.remove());
+
     // Configure Readability with enhanced options
-    const reader = new Readability(dom.window.document, {
+    const reader = new Readability(document, {
       charThreshold: 100,
       classesToPreserve: ['article', 'content', 'post'],
       keepClasses: true,
@@ -259,8 +218,7 @@ export async function extractArticle(url: string): Promise<ExtractedMetadata> {
       throw new Error('Failed to parse article content. The content might be dynamic or protected.');
     }
 
-    // Enhanced metadata extraction
-    const document = dom.window.document;
+    // Extract OpenGraph metadata with prioritized sources
     const metaTags = {
       title: document.querySelector('meta[property="og:title"]')?.getAttribute('content') ||
              document.querySelector('meta[name="twitter:title"]')?.getAttribute('content') ||
@@ -348,57 +306,17 @@ export async function extractArticle(url: string): Promise<ExtractedMetadata> {
       ogDescriptionSource = 'meta:description';
     }
 
-    // Download and convert og:image if present
-    let processedImageUrl = ogImageUrl;
-    if (ogImageUrl) {
-      try {
-        // Download image
-        const imageResponse = await fetch(ogImageUrl);
-        if (imageResponse.ok) {
-          const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-          
-          // Import image processing function
-          const { convertToPodcastShowImage } = await import('./image-processing');
-          
-          // Convert image to podcast format
-          const conversionResult = await convertToPodcastShowImage(
-            imageBuffer,
-            `${sanitizeTitle(article.title)}`
-          );
-          
-          // Use converted image path or fallback to default
-          processedImageUrl = conversionResult.path;
-          
-          // Log conversion results
-          if (conversionResult.error) {
-            console.warn('Image conversion warning:', conversionResult.error);
-          } else {
-            console.log('Image conversion successful:', conversionResult.metadata);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to process og:image:', error);
-      }
-    }
-
     return {
       title: metaTags.title || article.title || document.title || 'Untitled Article',
       content: formattedContent,
       ogDescription: ogDescription ? ogDescription.trim() : undefined,
       ogDescriptionSource,
-      ogImageUrl: processedImageUrl
+      ogImageUrl
     };
-
-  } finally {
-    // Ensure browser is closed
-    if (browser) {
-      await browser.close();
-    }
-  }
   } catch (error: any) {
     console.error('Article extraction error:', error);
     
-    // Enhanced error categorization for Playwright errors
+    // Enhanced error categorization for specific error types
     const errorMessages: { [key: string]: string } = {
       TypeError: 'Invalid HTML structure or network error',
       SyntaxError: 'Invalid HTML content',
@@ -407,11 +325,7 @@ export async function extractArticle(url: string): Promise<ExtractedMetadata> {
                    '2. The connection is slow\n' +
                    '3. The page requires authentication\n\n' +
                    'Please try using the direct text input method instead.',
-      TargetClosedError: 'The browser was closed unexpectedly',
       WebError: 'Failed to load the webpage',
-      BrowserError: 'Could not start the web browser',
-      ProtocolError: 'Failed to communicate with the webpage',
-      RouteError: 'Network request failed',
       SecurityError: 'Security error occurred (possibly SSL/TLS related)',
       ConsoleMessage: 'Webpage error detected'
     };
@@ -501,11 +415,9 @@ async function combineAudioBuffers(
     });
 
     // Read the combined file
-    const combinedBuffer = await import('fs/promises').then(
-      fs => fs.readFile(outputFile)
-    );
-
+    const combinedBuffer = await readFile(outputFile);
     return combinedBuffer;
+
   } finally {
     // Clean up temporary files
     const filesToDelete = [...inputFiles, inputListFile, outputFile];
@@ -556,33 +468,12 @@ export async function generateSpeech(
 
   try {
     // Import validation functions
-    const { validatePodcastAudio, fixAudioIssues } = await import('./audio-validation');
+    const { validatePodcastAudio } = await import('./audio-validation');
 
     // Validate the audio
     const validation = await validatePodcastAudio(tempFile);
     console.log('Audio validation results:', validation);
 
-    // If there are issues, attempt to fix them
-    if (!validation.isValid) {
-      console.log('Attempting to fix audio issues...');
-      const fixedPath = await fixAudioIssues(tempFile, validation);
-      
-      // Read the fixed file if it's different from the temp file
-      if (fixedPath !== tempFile) {
-        const fixedBuffer = await readFile(fixedPath);
-        await unlink(fixedPath); // Clean up fixed file
-        await unlink(tempFile);  // Clean up temp file
-        
-        // Validate the fixed audio
-        const fixedValidation = await validatePodcastAudio(fixedPath);
-        return { 
-          buffer: fixedBuffer,
-          validation: fixedValidation
-        };
-      }
-    }
-
-    // Return original buffer with validation results
     return { 
       buffer: combinedBuffer,
       validation

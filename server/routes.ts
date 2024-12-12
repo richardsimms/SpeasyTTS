@@ -261,32 +261,46 @@ export function registerRoutes(app: Express) {
       const { url, content } = req.body;
       let articleData;
 
-      const MAX_CONTENT_LENGTH = 100000; // Maximum content length allowed
+      const MAX_CONTENT_LENGTH = 25000; // Maximum content length for reliable TTS conversion
       
       if (url) {
         console.log('Processing URL:', url);
-        // Validate URL before processing
-        const validation = await validateUrl(url);
-        if (!validation.valid) {
-          console.log('URL validation failed:', validation.error);
-          return res.status(400).json({ 
-            error: validation.error || 'Invalid URL'
-          });
-        }
+        try {
+          // Validate URL before processing
+          const validation = await validateUrl(url);
+          if (!validation.valid) {
+            console.log('URL validation failed:', validation.error);
+            return res.status(400).json({ 
+              error: validation.error || 'Invalid URL'
+            });
+          }
 
-        articleData = await extractArticle(url);
-        
-        // Validate extracted content length
-        if (articleData.content.length > MAX_CONTENT_LENGTH) {
+          articleData = await extractArticle(url);
+          console.log('Article extracted successfully, length:', articleData.content.length);
+          
+          // Validate extracted content length
+          if (articleData.content.length > MAX_CONTENT_LENGTH) {
+            return res.status(400).json({
+              error: `Article content exceeds the maximum length of ${MAX_CONTENT_LENGTH} characters. Please try:\n` +
+                    '1. Using a shorter article\n' +
+                    '2. Splitting the content into smaller parts\n' +
+                    '3. Removing unnecessary sections'
+            });
+          }
+        } catch (error: any) {
+          console.error('Article extraction error:', error);
           return res.status(400).json({
-            error: `Article content is too long. Maximum allowed length is ${MAX_CONTENT_LENGTH} characters.`
+            error: error.message || 'Failed to extract article content'
           });
         }
       } else if (content) {
         // Validate direct input content length
         if (content.length > MAX_CONTENT_LENGTH) {
           return res.status(400).json({
-            error: `Article content is too long. Maximum allowed length is ${MAX_CONTENT_LENGTH} characters.`
+            error: `Content exceeds the maximum length of ${MAX_CONTENT_LENGTH} characters. Please try:\n` +
+                  '1. Using a shorter text\n' +
+                  '2. Splitting the content into smaller parts\n' +
+                  '3. Removing unnecessary sections'
           });
         }
         articleData = { title: "Custom Text", content };

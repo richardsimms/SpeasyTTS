@@ -115,39 +115,54 @@ interface ExtractedMetadata {
   ogImageUrl?: string;
 }
 
-// Enhanced content extraction with better error handling and metadata
+// Enhanced content extraction with Puppeteer and better error handling
 export async function extractArticle(url: string): Promise<ExtractedMetadata> {
   try {
-    // Configure fetch headers for better compatibility
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5',
-      'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache',
-      'DNT': '1'
-    };
+    // Import puppeteer
+    const puppeteer = await import('puppeteer');
+    
+    // Launch browser with stealth mode
+    const browser = await puppeteer.launch({
+      headless: 'new',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--window-size=1920x1080'
+      ]
+    });
 
-    // Fetch with timeout and retry logic
-    const fetchWithTimeout = async (url: string, retries = 2) => {
-      const timeout = 10000;
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-      try {
-        const response = await fetch(url, { headers, signal: controller.signal });
-        clearTimeout(timeoutId);
-        return response;
-      } catch (error: any) {
-        clearTimeout(timeoutId);
-        if (retries > 0 && (error.name === 'AbortError' || error.message.includes('ETIMEDOUT'))) {
-          return fetchWithTimeout(url, retries - 1);
-        }
-        throw error;
-      }
-    };
-
-    const response = await fetchWithTimeout(url);
+    try {
+      const page = await browser.newPage();
+      
+      // Configure the page for stealth
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      await page.setExtraHTTPHeaders({
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'DNT': '1',
+        'Upgrade-Insecure-Requests': '1'
+      });
+      
+      // Set viewport
+      await page.setViewport({ width: 1920, height: 1080 });
+      
+      // Enable JavaScript execution
+      await page.setJavaScriptEnabled(true);
+      
+      // Navigate to URL with timeout and wait until network is idle
+      await page.goto(url, {
+        waitUntil: ['networkidle0', 'domcontentloaded'],
+        timeout: 30000
+      });
+      
+      // Wait for main content to load
+      await page.waitForSelector('body', { timeout: 10000 });
+      
+      // Get the page content
+      const content = await page.content();
 
     // Enhanced error handling with specific messages
     if (!response.ok) {
@@ -162,9 +177,8 @@ export async function extractArticle(url: string): Promise<ExtractedMetadata> {
       throw new Error(errorMessages[response.status] || `Failed to fetch article: ${response.status}`);
     }
 
-    // Get and sanitize HTML content
-    const html = await response.text();
-    const sanitizedHtml = html
+    // Sanitize the obtained content
+    const sanitizedHtml = content
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
       .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
       .replace(/ style="[^"]*"/g, '')
@@ -325,11 +339,19 @@ export async function extractArticle(url: string): Promise<ExtractedMetadata> {
       ogImageUrl: processedImageUrl
     };
 
+  } finally {
+    // Ensure browser is closed
+    if (browser) {
+      await browser.close();
+    }
+  }
   } catch (error: any) {
-    // Enhanced error categorization
+    // Enhanced error categorization with Puppeteer-specific errors
     const errorMessages: { [key: string]: string } = {
       TypeError: 'Invalid HTML structure or network error',
       SyntaxError: 'Invalid HTML content',
+      TimeoutError: 'Page load timed out - the website might be blocking automated access',
+      ProtocolError: 'Failed to communicate with the browser',
       ECONNREFUSED: 'Could not connect to the website',
       ETIMEDOUT: 'Connection timed out',
       SSL: 'SSL/TLS error occurred',

@@ -15,8 +15,9 @@ export async function convertArticle(input: { url?: string; content?: string }) 
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to convert article");
+    const errorData = await response.json();
+    console.error('Article conversion error:', errorData);
+    throw new Error(errorData.error || "Failed to convert article");
   }
 
   return response.json();

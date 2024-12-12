@@ -170,8 +170,42 @@ export async function extractArticle(url: string): Promise<ExtractedMetadata> {
 
       // Check if we were redirected to a login page
       const currentUrl = page.url().toLowerCase();
+      console.log('Final URL after potential redirects:', currentUrl);
+      
       if (currentUrl.includes('login') || currentUrl.includes('signin') || currentUrl.includes('auth')) {
-        throw new Error('Unable to access content: Redirected to authentication page. This content requires login.');
+        throw new Error(
+          'This content requires authentication. Please try one of these methods:\n' +
+          '1. Wait a few minutes and try again (if rate-limited)\n' +
+          '2. Copy the article text and use the direct text input method\n' +
+          '3. Find the original article URL instead of the web-share link'
+        );
+      }
+      
+      // Check if the page loaded successfully
+      const mainContent = await page.$('body');
+      if (!mainContent) {
+        throw new Error('Could not load the article content. The page might be protected or require authentication.');
+      }
+      
+      // Check for common error messages or blocking elements
+      const errorTexts = await page.$$eval('*', (elements) => {
+        return elements
+          .map(el => el.textContent)
+          .filter(text => text && (
+            text.includes('Access Denied') ||
+            text.includes('Login Required') ||
+            text.includes('Authentication Required') ||
+            text.includes('Please sign in')
+          ));
+      });
+      
+      if (errorTexts.length > 0) {
+        throw new Error(
+          'Access to this content is restricted. Please try:\n' +
+          '1. Using the direct text input method\n' +
+          '2. Finding the original article URL\n' +
+          '3. Ensuring you have proper access rights'
+        );
       }
 
       // Wait for potential JavaScript redirects

@@ -123,21 +123,51 @@ export async function extractArticle(url: string): Promise<ExtractedMetadata> {
     
     // Launch browser with enhanced stealth mode and authentication handling
     console.log('Launching Puppeteer browser for URL:', url);
-    const browser = await puppeteer.launch({
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--disable-gpu',
-        '--window-size=1920x1080',
-        '--disable-web-security',
-        '--disable-features=IsolateOrigins,site-per-process',
-        '--ignore-certificate-errors',
-        '--ignore-certificate-errors-spki-list'
-      ]
-    });
+    
+    // Enhanced browser launch with fallback options
+    let browser;
+    try {
+      // Try launching with system Chrome first
+      browser = await puppeteer.launch({
+        headless: 'new',
+        executablePath: '/usr/bin/chromium-browser',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--disable-gpu',
+          '--window-size=1920x1080',
+          '--disable-web-security',
+          '--disable-features=IsolateOrigins,site-per-process',
+          '--ignore-certificate-errors',
+          '--ignore-certificate-errors-spki-list',
+          '--single-process',
+          '--no-zygote'
+        ],
+        ignoreDefaultArgs: ['--disable-extensions']
+      });
+    } catch (launchError) {
+      console.error('Failed to launch browser with system Chrome:', launchError);
+      
+      // Try launching with downloaded Chrome as fallback
+      try {
+        browser = await puppeteer.launch({
+          headless: 'new',
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--single-process',
+            '--no-zygote'
+          ]
+        });
+      } catch (fallbackError) {
+        console.error('Failed to launch browser with fallback options:', fallbackError);
+        throw new Error('Could not initialize web browser for content extraction. ' +
+                       'Please try using the direct text input method instead.');
+      }
+    }
 
     try {
       const page = await browser.newPage();
@@ -399,6 +429,8 @@ export async function extractArticle(url: string): Promise<ExtractedMetadata> {
     }
   }
   } catch (error: any) {
+    console.error('Article extraction error:', error);
+    
     // Enhanced error categorization with Puppeteer-specific errors
     const errorMessages: { [key: string]: string } = {
       TypeError: 'Invalid HTML structure or network error',
@@ -408,7 +440,8 @@ export async function extractArticle(url: string): Promise<ExtractedMetadata> {
       ECONNREFUSED: 'Could not connect to the website',
       ETIMEDOUT: 'Connection timed out',
       SSL: 'SSL/TLS error occurred',
-      AbortError: 'Request timed out'
+      AbortError: 'Request timed out',
+      LaunchError: 'Could not start the web browser. Please try the direct text input method.'
     };
 
     const errorType = Object.keys(errorMessages).find(type => 

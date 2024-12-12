@@ -121,7 +121,8 @@ export async function extractArticle(url: string): Promise<ExtractedMetadata> {
     // Import puppeteer
     const puppeteer = await import('puppeteer');
     
-    // Launch browser with stealth mode
+    // Launch browser with enhanced stealth mode and authentication handling
+    console.log('Launching Puppeteer browser for URL:', url);
     const browser = await puppeteer.launch({
       headless: 'new',
       args: [
@@ -130,7 +131,11 @@ export async function extractArticle(url: string): Promise<ExtractedMetadata> {
         '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
         '--disable-gpu',
-        '--window-size=1920x1080'
+        '--window-size=1920x1080',
+        '--disable-web-security',
+        '--disable-features=IsolateOrigins,site-per-process',
+        '--ignore-certificate-errors',
+        '--ignore-certificate-errors-spki-list'
       ]
     });
 
@@ -152,11 +157,25 @@ export async function extractArticle(url: string): Promise<ExtractedMetadata> {
       // Enable JavaScript execution
       await page.setJavaScriptEnabled(true);
       
-      // Navigate to URL with timeout and wait until network is idle
-      await page.goto(url, {
+      console.log('Attempting to navigate to URL:', url);
+      
+      // Enhanced navigation with authentication handling
+      const response = await page.goto(url, {
         waitUntil: ['networkidle0', 'domcontentloaded'],
         timeout: 30000
       });
+
+      console.log('Navigation response status:', response?.status());
+      console.log('Current page URL:', page.url());
+
+      // Check if we were redirected to a login page
+      const currentUrl = page.url().toLowerCase();
+      if (currentUrl.includes('login') || currentUrl.includes('signin') || currentUrl.includes('auth')) {
+        throw new Error('Unable to access content: Redirected to authentication page. This content requires login.');
+      }
+
+      // Wait for potential JavaScript redirects
+      await page.waitForTimeout(2000);
       
       // Wait for main content to load
       await page.waitForSelector('body', { timeout: 10000 });

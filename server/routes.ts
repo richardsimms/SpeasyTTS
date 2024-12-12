@@ -97,17 +97,9 @@ async function validateUrl(url: string): Promise<{ valid: boolean; error?: strin
     // Enhanced paywall detection - check both pathname and search parameters
     const urlString = parsedUrl.pathname + parsedUrl.search;
     
-    // Check for web-share URLs first
-    if (parsedUrl.hostname.includes('sparkmailapp.com') || /web-share|shared/.test(urlString)) {
-      return {
-        valid: false,
-        error: 'This appears to be a web-share or email preview link that requires authentication.\n\n' +
-               'To fix this:\n' +
-               '1. Copy the actual article text and use the direct text input method\n' +
-               '2. Find and use the original article URL instead\n' +
-               '3. Make sure you\'re using a publicly accessible URL'
-      };
-    }
+    // Allow web-share URLs to pass validation
+    // They will be handled by Puppeteer's authentication handling
+    console.log('Processing potential web-share URL:', urlString);
     
     if (restrictedPatterns.some(pattern => pattern.test(urlString))) {
       return { 

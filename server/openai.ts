@@ -118,74 +118,31 @@ interface ExtractedMetadata {
 // Enhanced content extraction with Puppeteer and better error handling
 export async function extractArticle(url: string): Promise<ExtractedMetadata> {
   try {
-    // Import puppeteer
-    const puppeteer = await import('puppeteer');
+    // Import playwright
+    const { chromium } = await import('playwright');
     
-    // Launch browser with enhanced stealth mode and authentication handling
-    console.log('Launching Puppeteer browser for URL:', url);
+    // Launch browser with enhanced stealth mode
+    console.log('Launching Playwright browser for URL:', url);
     
-    // Enhanced browser launch with fallback options
     let browser;
     try {
-      // Try launching with system Chrome first
-      browser = await puppeteer.launch({
-        headless: 'new',
-        executablePath: '/usr/bin/chromium-browser',
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--disable-gpu',
-          '--window-size=1920x1080',
-          '--disable-web-security',
-          '--disable-features=IsolateOrigins,site-per-process',
-          '--ignore-certificate-errors',
-          '--ignore-certificate-errors-spki-list',
-          '--single-process',
-          '--no-zygote'
-        ],
-        ignoreDefaultArgs: ['--disable-extensions']
+      // Launch browser with enhanced options
+      browser = await chromium.launch({
+        headless: true
       });
-    } catch (launchError) {
-      console.error('Failed to launch browser with system Chrome:', launchError);
       
-      // Try launching with downloaded Chrome as fallback
-      try {
-        browser = await puppeteer.launch({
-          headless: 'new',
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--single-process',
-            '--no-zygote'
-          ]
-        });
-      } catch (fallbackError) {
-        console.error('Failed to launch browser with fallback options:', fallbackError);
-        throw new Error('Could not initialize web browser for content extraction. ' +
-                       'Please try using the direct text input method instead.');
-      }
-    }
+      const context = await browser.newContext({
+        viewport: { width: 1920, height: 1080 },
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        extraHTTPHeaders: {
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'DNT': '1',
+          'Upgrade-Insecure-Requests': '1'
+        }
+      });
 
-    try {
-      const page = await browser.newPage();
-      
-      // Configure the page for stealth
-      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-      await page.setExtraHTTPHeaders({
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'DNT': '1',
-        'Upgrade-Insecure-Requests': '1'
-      });
-      
-      // Set viewport
-      await page.setViewport({ width: 1920, height: 1080 });
-      
-      // Enable JavaScript execution
-      await page.setJavaScriptEnabled(true);
+      const page = await context.newPage();
       
       console.log('Attempting to navigate to URL:', url);
       
@@ -431,27 +388,36 @@ export async function extractArticle(url: string): Promise<ExtractedMetadata> {
   } catch (error: any) {
     console.error('Article extraction error:', error);
     
-    // Enhanced error categorization with Puppeteer-specific errors
+    // Enhanced error categorization for Playwright errors
     const errorMessages: { [key: string]: string } = {
       TypeError: 'Invalid HTML structure or network error',
       SyntaxError: 'Invalid HTML content',
-      TimeoutError: 'Page load timed out - the website might be blocking automated access',
-      ProtocolError: 'Failed to communicate with the browser',
-      ECONNREFUSED: 'Could not connect to the website',
-      ETIMEDOUT: 'Connection timed out',
-      SSL: 'SSL/TLS error occurred',
-      AbortError: 'Request timed out',
-      LaunchError: 'Could not start the web browser. Please try the direct text input method.'
+      TimeoutError: 'Page load timed out. This could mean:\n' +
+                   '1. The website is blocking automated access\n' +
+                   '2. The connection is slow\n' +
+                   '3. The page requires authentication\n\n' +
+                   'Please try using the direct text input method instead.',
+      TargetClosedError: 'The browser was closed unexpectedly',
+      WebError: 'Failed to load the webpage',
+      BrowserError: 'Could not start the web browser',
+      ProtocolError: 'Failed to communicate with the webpage',
+      RouteError: 'Network request failed',
+      SecurityError: 'Security error occurred (possibly SSL/TLS related)',
+      ConsoleMessage: 'Webpage error detected'
     };
 
     const errorType = Object.keys(errorMessages).find(type => 
       error instanceof Error && (
-        error.name === type || 
-        error.message.includes(type)
+        error.name.includes(type) || 
+        error.message.includes(type.toLowerCase())
       )
     );
 
-    throw new Error(`${errorType ? errorMessages[errorType] : 'Article extraction failed'}: ${error.message}`);
+    throw new Error(
+      errorType 
+        ? `${errorMessages[errorType]}\n\nTechnical details: ${error.message}`
+        : `Could not extract article content. Please try using the direct text input method.\n\nTechnical details: ${error.message}`
+    );
   }
 }
 

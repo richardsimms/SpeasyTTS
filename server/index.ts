@@ -64,7 +64,7 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
     // ALWAYS serve the app on port 5000
     // this serves both the API and the client
     const PORT = process.env.PORT || 5000;
-    const HOST = process.env.HOST || "0.0.0.0";
+    const HOST = "0.0.0.0"; // Always bind to all interfaces
     
     server.listen(PORT, HOST, () => {
       const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -74,7 +74,9 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
         hour12: true,
       });
 
+      console.log(`${formattedTime} [express] Server starting...`);
       console.log(`${formattedTime} [express] Server running at http://${HOST}:${PORT}`);
+      console.log(`${formattedTime} [express] Environment: ${app.get("env")}`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

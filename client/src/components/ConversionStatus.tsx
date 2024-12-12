@@ -114,10 +114,10 @@ export default function ConversionStatus({
           </Button>        
       </div>
 
-      {article.status === "failed" && article.metadata?.error && (
+      {article.status === "failed" && (article.metadata?.error || article.error) && (
         <div className="mt-2 p-3 bg-destructive/10 rounded-md border border-destructive/20">
           <p className="text-sm font-medium text-destructive mb-1">Error Converting Article</p>
-          <p className="text-sm text-destructive/90">{article.metadata.error}</p>
+          <p className="text-sm text-destructive/90">{article.metadata?.error || article.error}</p>
           
           {/* Enhanced error handling with more specific tips */}
           {article.metadata.error.includes('paywall') && (

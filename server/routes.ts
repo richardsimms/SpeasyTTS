@@ -257,15 +257,18 @@ async function validateUrl(url: string): Promise<{ valid: boolean; error?: strin
 export function registerRoutes(app: Express) {
   app.post("/api/articles", async (req, res) => {
     try {
+      console.log('Article conversion request:', req.body);
       const { url, content } = req.body;
       let articleData;
 
       const MAX_CONTENT_LENGTH = 100000; // Maximum content length allowed
       
       if (url) {
+        console.log('Processing URL:', url);
         // Validate URL before processing
         const validation = await validateUrl(url);
         if (!validation.valid) {
+          console.log('URL validation failed:', validation.error);
           return res.status(400).json({ 
             error: validation.error || 'Invalid URL'
           });

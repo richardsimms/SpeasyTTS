@@ -130,6 +130,12 @@ async function validateUrl(url: string): Promise<{ valid: boolean; error?: strin
         'Pragma': 'no-cache'
       },
       redirect: 'follow'
+    }).catch(error => {
+      // Ignore CSS parsing errors
+      if (error.message.includes('Could not parse CSS stylesheet')) {
+        return { ok: true, status: 200 };
+      }
+      throw error;
     });
 
     // Enhanced HTTP status code handling with more detailed error messages

@@ -486,4 +486,15 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ error: error.message });
     }
   });
+
+  app.delete("/api/articles/cleanup/processing", async (req, res) => {
+    try {
+      await db.delete(articles)
+        .where(eq(articles.status, "processing"));
+      res.status(204).send();
+    } catch (error: any) {
+      console.error('Cleanup error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 }
